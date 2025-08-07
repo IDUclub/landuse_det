@@ -116,7 +116,7 @@ async def _form_source_params(sources: list[dict]) -> dict:
         ].to_dict()
 
 
-async def get_functional_zones_scenario_id(project_id: int, is_context: bool = False, source: str = None) -> dict:
+async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = False, source: str = None) -> dict:
     """
     Fetches functional zones for a project with an optional context flag and source selection.
 
@@ -131,34 +131,34 @@ async def get_functional_zones_scenario_id(project_id: int, is_context: bool = F
     Raises:
     http_exception: If the response is empty or the specified source is not available.
     """
-    base_scenario_id = await get_projects_base_scenario_id(project_id)
-    source_data = await get_functional_zone_sources(base_scenario_id, source)
+    # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
+    source_data = await get_functional_zone_sources(scenario_id, source)
 
     if not source_data or "source" not in source_data or "year" not in source_data:
-        raise http_exception(404, "No valid source found for the given project ID", project_id)
+        raise http_exception(404, "No valid source found for the given project ID", scenario_id)
 
     source = source_data["source"]
     year = source_data["year"]
 
     endpoint = (
-        f"/api/v1/projects/{project_id}/context/functional_zones?year={year}&source={source}"
+        f"/api/v1/scenarios/{scenario_id}/context/functional_zones?year={year}&source={source}"
         if is_context
-        else f"/api/v1/scenarios/{base_scenario_id}/functional_zones?year={year}&source={source}"
+        else f"/api/v1/scenarios/{scenario_id}/functional_zones?year={year}&source={source}"
     )
 
     response = await urban_db_api.get(endpoint)
     if not response or "features" not in response or not response["features"]:
-        raise http_exception(404, "No functional zones found for the given project ID", project_id)
+        raise http_exception(404, "No functional zones found for the given project ID", scenario_id)
 
     return response
 
 
-async def get_all_physical_objects_geometries(project_id: int, is_context: bool = False) -> dict:
+async def get_all_physical_objects_geometries(scenario_id: int, is_context: bool = False) -> dict:
     """
     Fetches all physical object geometries for a project, optionally for context.
 
     Parameters:
-        project_id (int): ID of the project.
+        scenario_id (int): ID of the project.
         is_context (bool): Whether to fetch context geometries.
 
     Returns:
@@ -167,26 +167,25 @@ async def get_all_physical_objects_geometries(project_id: int, is_context: bool 
     Raises:
         http_exception: If the response is empty.
     """
-    base_scenario_id = await get_projects_base_scenario_id(project_id)
+    # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
 
     endpoint = (
-        f"/api/v1/projects/{project_id}/context/geometries_with_all_objects"
+        f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects"
         if is_context
-        else f"/api/v1/scenarios/{base_scenario_id}/geometries_with_all_objects"
+        else f"/api/v1/scenarios/{scenario_id}/context/geometries_with_all_objects"
     )
 
     try:
         response = await urban_db_api.get(endpoint)
-    except Exception:
-        raise http_exception(404, "No geometries found for the given project ID:", project_id)
+    except Exception as e:
+        raise http_exception(404, "No geometries found for the given scenario ID:", str(e))
 
     return response
 
 
-async def get_all_physical_objects_geometries_type_id(project_id: int, object_type_id: int) -> dict:
-    base_scenario_id = await get_projects_base_scenario_id(project_id)
+async def get_all_physical_objects_geometries_type_id(scenario_id: int, object_type_id: int) -> dict:
     return await urban_db_api.get(
-        f"/api/v1/scenarios/{base_scenario_id}/geometries_with_all_objects?physical_object_type_id={object_type_id}"
+        f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects?physical_object_type_id={object_type_id}"
     )
 
 

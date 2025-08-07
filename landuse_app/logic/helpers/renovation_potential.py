@@ -411,10 +411,10 @@ async def process_zones_with_bulk_update(
 
 
 async def get_renovation_potential(
-    project_id: int,
+    scenario_id: int,
     is_context: bool,
     profile: Optional[Profile] = None,
-    scenario_id: bool = False,
+    # scenario_id: bool = False,
     source: str = None
 ) -> gpd.GeoDataFrame:
     """
@@ -446,23 +446,23 @@ async def get_renovation_potential(
     profile_key = str(profile) if profile is not None else "no_profile"
 
     if source is None:
-        base_scenario_id = await get_projects_base_scenario_id(project_id)
-        source_data = await get_functional_zone_sources(base_scenario_id)
+        # base_scenario_id = await get_projects_base_scenario_id(project_id)
+        source_data = await get_functional_zone_sources(scenario_id)
         source_key = source_data["source"]
     else:
         source_key = source
 
-    cache_name = f"renovation_potential_project-{project_id}_is_context-{is_context}"
+    cache_name = f"renovation_potential_project-{scenario_id}_is_context-{is_context}"
     cache_file = caching_service.get_recent_cache_file(cache_name, {"profile": profile_key, "source": source_key})
 
     if cache_file and caching_service.is_cache_valid(cache_file):
-        logger.info(f"Using cached renovation potential for project {project_id}")
+        logger.info(f"Using cached renovation potential for scenario {scenario_id}")
         cached_data = caching_service.load_cache(cache_file)
         return gpd.GeoDataFrame.from_features(cached_data, crs="EPSG:4326")
 
     physical_objects_dict, landuse_polygons = await asyncio.gather(
-        data_extraction.extract_physical_objects(project_id, is_context),
-        data_extraction.extract_landuse(project_id, is_context, scenario_id, source)
+        data_extraction.extract_physical_objects(scenario_id, is_context),
+        data_extraction.extract_landuse(scenario_id, is_context, scenario_id, source)
     )
     physical_objects = physical_objects_dict["physical_objects"]
     utm_crs = physical_objects.estimate_utm_crs()

@@ -11,17 +11,17 @@ from .routers import renovation_router, urbanization_router, landuse_percentages
 
 
 @renovation_router.get(
-    "/projects/{project_id}/renovation_potential",
+    "/scenarios/{scenario_id}/renovation_potential",
     response_model=dict,
     description=(
-            "Function for getting renovation potential for a project. "
+            "Function for getting renovation potential for a scenario. "
             "Additionally, returns layer in GeoJSON implemented in JSON response. "
-            "Args: project_id (int): unique identifier of the project. "
+            "Args: scenario_id (int): unique identifier of the scenario. "
             "Returns: GeoJSON: renovation potential data."
     )
 )
 async def get_projects_renovation_potential(
-        project_id: int = Path(..., description="The unique identifier of the project."),
+        scenario_id: int = Path(..., description="The unique identifier of the scenario."),
         source: str = Query(None, description="The source of the landuse zones data. Available sources are: PZZ, OSM"),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -30,21 +30,21 @@ async def get_projects_renovation_potential(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source
         )
-    return await landuse_service.get_renovation_potential(project_id, source=source)
+    return await landuse_service.get_renovation_potential(scenario_id, source=source)
 
 
 @urbanization_router.get(
-    "/projects/{project_id}/urbanization_level",
+    "/scenarios/{scenario_id}/urbanization_level",
     response_model=GeoJSON,
     description=(
-            "Function for getting urbanization level for a project. "
+            "Function for getting urbanization level for a scenario. "
             "Additionally, returns layer in GeoJSON implemented in JSON response. "
-            "Args: project_id (int): unique identifier of the project. "
+            "Args: scenario_id (int): unique identifier of the scenario. "
             "Returns: GeoJSON: urbanization level data."
     )
 )
 async def get_projects_urbanization_level(
-        project_id: int = Path(..., description="The unique identifier of the project."),
+        scenario_id: int = Path(..., description="The unique identifier of the scenario."),
         source: str = Query(None, description="The source of the landuse zones data. Available sources are: PZZ, OSM"),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -53,21 +53,21 @@ async def get_projects_urbanization_level(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source
         )
-    return await landuse_service.get_urbanization_level(project_id, source=source)
+    return await landuse_service.get_urbanization_level(scenario_id, source=source)
 
 
 @renovation_router.get(
-    "/projects/{project_id}/context/renovation_potential",
+    "/scenarios/{scenario_id}/context/renovation_potential",
     response_model=dict,
     description=(
-            "Function for getting renovation potential for a project's context. "
+            "Function for getting renovation potential for a scenario's context. "
             "Additionally, returns layer in GeoJSON implemented in JSON response. "
-            "Args: project_id (int): unique identifier of the project. "
+            "Args: scenario_id (int): unique identifier of the scenario. "
             "Returns: GeoJSON: context renovation potential data."
     )
 )
 async def get_projects_context_renovation_potential(
-        project_id: int = Path(..., description="The unique identifier of the project."),
+        scenario_id: int = Path(..., description="The unique identifier of the scenario."),
         source: str = Query(None, description="The source of the landuse zones data. Available sources are: PZZ, OSM"),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -76,11 +76,11 @@ async def get_projects_context_renovation_potential(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source
         )
-    return await landuse_service.get_context_renovation_potential(project_id, source=source)
+    return await landuse_service.get_context_renovation_potential(scenario_id, source=source)
 
 
 @urbanization_router.get(
-    "/projects/{project_id}/context/urbanization_level",
+    "/scenarios/{scenario_id}/context/urbanization_level",
     response_model=GeoJSON,
     description=(
             "Function for getting urbanization level for a project's context. "
@@ -90,7 +90,7 @@ async def get_projects_context_renovation_potential(
     )
 )
 async def get_projects_context_urbanization_level(
-        project_id: int = Path(..., description="The unique identifier of the project."),
+        scenario_id: int = Path(..., description="The unique identifier of the scenario."),
         source: str = Query(None, description="The source of the landuse zones data. Available sources are: PZZ, OSM"),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -99,7 +99,7 @@ async def get_projects_context_urbanization_level(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source
         )
-    return await landuse_service.get_context_urbanization_level(project_id, source=source)
+    return await landuse_service.get_context_urbanization_level(scenario_id, source=source)
 
 
 @landuse_percentages_router.get(
