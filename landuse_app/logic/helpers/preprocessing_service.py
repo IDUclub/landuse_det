@@ -11,7 +11,7 @@ from ...exceptions.http_exception_wrapper import http_exception
 
 class PreProcessingService:
     @staticmethod
-    async def extract_physical_objects(project_id: int, is_context: bool, scenario_id_flag: bool = False) -> dict[
+    async def extract_physical_objects(scenario_id: int, is_context: bool, scenario_id_flag: bool = False) -> dict[
         str, gpd.GeoDataFrame]:
         """
         Extracts and processes physical objects for a given project from GeoJson,
@@ -25,13 +25,13 @@ class PreProcessingService:
 
         Returns:
         dict[str, gpd.GeoDataFrame]
-            Словарь с обработанным GeoDataFrame и площадями для водных, зелёных и лесных объектов.
+            Dictionary with processed GeoDataFrame with areas of water, green (grass) and forest objects.
         """
-        logger.info("Физические объекты загружаются")
+        logger.info("Loading physical objects")
         if scenario_id_flag:
-            resp = await get_all_physical_objects_geometries_scen_id_percentages(project_id)
+            resp = await get_all_physical_objects_geometries_scen_id_percentages(scenario_id)
         else:
-            resp = await get_all_physical_objects_geometries(project_id, is_context)
+            resp = await get_all_physical_objects_geometries(scenario_id, is_context)
 
         all_data: list[dict] = []
         for feature in resp.get("features", []):
@@ -45,7 +45,7 @@ class PreProcessingService:
                 if not geom.is_valid or geom.is_empty:
                     continue
             except Exception as e:
-                logger.error(f"Ошибка при обработке геометрии: {e}")
+                logger.error(f"Error processing geometry: {e}")
                 continue
 
             for phys in props.get("physical_objects", []):
@@ -112,7 +112,7 @@ class PreProcessingService:
                 base.update({"category": "other"})
                 all_data.append(base)
 
-        logger.info("Физические объекты загружены")
+        logger.info("Physical objects loaded")
         df = pd.DataFrame(all_data)
         gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326").drop_duplicates("physical_object_id")
         gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
@@ -130,7 +130,7 @@ class PreProcessingService:
         }
 
     @staticmethod
-    async def extract_landuse(project_id: int, is_context: bool, scenario_id_flag: bool = False, source: str = None, ) \
+    async def extract_landuse(scenario_id: int, is_context: bool, scenario_id_flag: bool = False, source: str = None, ) \
             -> gpd.GeoDataFrame:
         """
         Extracts functional zones polygons for a given project and returns them as a GeoDataFrame.
@@ -152,10 +152,10 @@ class PreProcessingService:
             If the input data is malformed or invalid.
         """
         if scenario_id_flag:
-            geojson_data = await get_functional_zones_scen_id_percentages(project_id)
+            geojson_data = await get_functional_zones_scen_id_percentages(scenario_id)
         else:
-            geojson_data = await get_functional_zones_scenario_id(project_id, is_context)
-        logger.info("Функциональные зоны загружаются")
+            geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context)
+        logger.info("Functional zones loading")
 
         features = geojson_data["features"]
         geometries = []
@@ -202,7 +202,7 @@ class PreProcessingService:
             "zone_type_nickname": {"unknown": "Жилая зона"}
         }, inplace=True)
 
-        logger.info("Функциональные зоны загружены")
+        logger.info("Functional zones are loaded")
         return landuse_polygons
 
     @staticmethod
@@ -304,26 +304,6 @@ class PreProcessingService:
                 })
                 parsed.append(row)
 
-        # elif object_data["object_type_id"] == 5:
-        #     services = obj.get("services", [])
-        #     if services:
-        #         parsed = []
-        #         for service in services:
-        #             tmp = object_data.copy()
-        #             tmp["category"] = "non_residential"
-        #             tmp["service_id"] = service.get("service_id")
-        #             tmp["service_name"] = service.get("name")
-        #             tmp["is_capacity_real"] = service.get("is_capacity_real")
-        #             parsed.append(tmp)
-        #         return parsed
-        #     else:
-        #         object_data["category"] = "non_residential"
-
-        # elif object_data["object_type"] == "Рекреационная зона":
-        #     object_data["category"] = "recreational"
-        #
-        # else:
-        #     object_data["category"] = "other"
 
         return [object_data]
 
