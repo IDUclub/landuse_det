@@ -170,9 +170,9 @@ async def get_all_physical_objects_geometries(scenario_id: int, is_context: bool
     # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
 
     endpoint = (
-        f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects"
+        f"/api/v1/scenarios/{scenario_id}/context/geometries_with_all_objects"
         if is_context
-        else f"/api/v1/scenarios/{scenario_id}/context/geometries_with_all_objects"
+        else f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects"
     )
 
     try:
