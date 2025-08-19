@@ -12,7 +12,7 @@ from storage.caching import caching_service
 from .interpretation_service import interpretation_service
 from .preprocessing_service import data_extraction
 from .spatial_methods import SpatialMethods
-from .urban_api_access import get_projects_base_scenario_id, get_functional_zone_sources
+from .urban_api_access import get_functional_zone_sources
 from ..constants.constants import actual_zone_mapping
 from ...exceptions.http_exception_wrapper import http_exception
 
@@ -223,9 +223,7 @@ def _calc_building_percentages_core(storeys: np.ndarray) -> dict[str, float]:
     if storeys.size == 0:
         return {"ИЖС": 0, "Малоэтажная": 0, "Среднеэтажная": 0, "Многоэтажная": 0}
 
-    # бинарные границы
     bins = np.array([0, 2, 4, 8, np.inf], dtype=float)
-    # получаем индексы корзин
     idx = np.searchsorted(bins, storeys, side="right") - 1
     counts = np.bincount(idx, minlength=4)
     total = storeys.size
@@ -287,7 +285,6 @@ def calculate_profiled_by_criteria(
     if zone_area == 0 or matches_df.empty or not criteria_list:
         return 0.0
 
-    # собираем все нужные id сразу
     obj_ids = [c["physical_object_type_id"] for c in criteria_list if c.get("physical_object_type_id") is not None]
     srv_ids = [c["service_type_id"] for c in criteria_list if c.get("service_type_id") is not None]
 
@@ -414,7 +411,6 @@ async def get_renovation_potential(
     scenario_id: int,
     is_context: bool,
     profile: Optional[Profile] = None,
-    # scenario_id: bool = False,
     source: str = None
 ) -> gpd.GeoDataFrame:
     """
@@ -446,7 +442,6 @@ async def get_renovation_potential(
     profile_key = str(profile) if profile is not None else "no_profile"
 
     if source is None:
-        # base_scenario_id = await get_projects_base_scenario_id(project_id)
         source_data = await get_functional_zone_sources(scenario_id)
         source_key = source_data["source"]
     else:
@@ -462,7 +457,7 @@ async def get_renovation_potential(
 
     physical_objects_dict, landuse_polygons = await asyncio.gather(
         data_extraction.extract_physical_objects(scenario_id, is_context),
-        data_extraction.extract_landuse(scenario_id, is_context, scenario_id, source)
+        data_extraction.extract_landuse(scenario_id, is_context, source)
     )
     physical_objects = physical_objects_dict["physical_objects"]
     utm_crs = physical_objects.estimate_utm_crs()
@@ -613,19 +608,14 @@ async def calculate_zone_percentages(scenario_id: int, is_context: bool = False,
     Returns:
         dict: A dictionary with the percentages for each unique landuse zone.
     """
-    if scenario_id:
-        physical_objects_dict, landuse_polygons = await asyncio.gather(
-            data_extraction.extract_physical_objects(scenario_id, is_context, True),
-            data_extraction.extract_landuse(scenario_id, is_context, True, source)
-        )
-    else:
-        physical_objects_dict, landuse_polygons = await asyncio.gather(
-            data_extraction.extract_physical_objects(scenario_id, is_context),
-            data_extraction.extract_landuse(scenario_id, is_context, False, source)
-        )
+    physical_objects_dict, landuse_polygons = await asyncio.gather(
+        data_extraction.extract_physical_objects(scenario_id, is_context, True),
+        data_extraction.extract_landuse(scenario_id, is_context, source)
+    )
+
     water_objects = physical_objects_dict["water_objects"]
-    green_objects = physical_objects_dict["green_objects"]  # новое
-    forests = physical_objects_dict["forests"]  # новое
+    green_objects = physical_objects_dict["green_objects"]
+    forests = physical_objects_dict["forests"]
     utm_crs = landuse_polygons.estimate_utm_crs()
     landuse_polygons = landuse_polygons.to_crs(utm_crs)
 
@@ -678,9 +668,9 @@ async def calculate_zone_percentages(scenario_id: int, is_context: bool = False,
     return filtered_zone_percentages
 
 
-async def get_projects_renovation_potential(project_id: int, source: str = None) -> dict:
+async def get_projects_renovation_potential(scenario_id: int, source: str = None) -> dict:
     """Calculate renovation potential for project and include discomfort as a separate key."""
-    landuse_polygons = await get_renovation_potential(project_id, is_context=False, source=source)
+    landuse_polygons = await get_renovation_potential(scenario_id, is_context=False, source=source)
     discomfort_value = (
         round(landuse_polygons["Неудобия"].iloc[0], 2)
         if "Неудобия" in landuse_polygons.columns and not landuse_polygons["Неудобия"].isna().iloc[0]
@@ -699,20 +689,20 @@ async def get_projects_renovation_potential(project_id: int, source: str = None)
     return response
 
 
-async def get_projects_urbanization_level(project_id: int, source: str = None) -> GeoJSON:
+async def get_projects_urbanization_level(scenario_id: int, source: str = None) -> GeoJSON:
     """Calculate urbanization level for project."""
-    logger.info(f"Calculating urbanization level for project {project_id}")
-    landuse_polygons = await get_renovation_potential(project_id, is_context=False, source=source)
+    logger.info(f"Calculating urbanization level for scenario {scenario_id}")
+    landuse_polygons = await get_renovation_potential(scenario_id, is_context=False, source=source)
     landuse_polygons = await interpretation_service.interpret_urbanization_value(landuse_polygons)
     landuse_polygons = await interpretation_service.interpret_renovation_value(landuse_polygons)
     landuse_polygons = await filter_response(landuse_polygons)
     return GeoJSON.from_geodataframe(landuse_polygons)
 
 
-async def get_projects_context_renovation_potential(project_id: int, source: str = None) -> dict:
+async def get_projects_context_renovation_potential(scenario_id: int, source: str = None) -> dict:
     """Calculate renovation potential for project's context."""
-    logger.info(f"Calculating renovation potential for project {project_id}")
-    landuse_polygons = await get_renovation_potential(project_id, is_context=True, source=source)
+    logger.info(f"Calculating renovation potential for project {scenario_id}")
+    landuse_polygons = await get_renovation_potential(scenario_id, is_context=True, source=source)
 
     discomfort_value = (
         round(landuse_polygons["Неудобия"].iloc[0], 2)
@@ -732,10 +722,10 @@ async def get_projects_context_renovation_potential(project_id: int, source: str
     return response
 
 
-async def get_projects_context_urbanization_level(project_id: int, source: str = None) -> GeoJSON:
+async def get_projects_context_urbanization_level(scenario_id: int, source: str = None) -> GeoJSON:
     """Calculate urbanization level for project's context."""
-    logger.info(f"Calculating urbanization level for project {project_id}")
-    landuse_polygons = await get_renovation_potential(project_id, is_context=True, source=source)
+    logger.info(f"Calculating urbanization level for project {scenario_id}")
+    landuse_polygons = await get_renovation_potential(scenario_id, is_context=True, source=source)
     landuse_polygons = await interpretation_service.interpret_urbanization_value(landuse_polygons)
     landuse_polygons = await interpretation_service.interpret_renovation_value(landuse_polygons)
     landuse_polygons = await filter_response(landuse_polygons)

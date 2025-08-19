@@ -4,22 +4,21 @@ import pandas as pd
 from loguru import logger
 from shapely.geometry import shape
 from .urban_api_access import get_functional_zones_territory_id, get_physical_objects_from_territory_parallel, \
-    get_all_physical_objects_geometries_scen_id_percentages, get_all_physical_objects_geometries, \
-    get_functional_zones_scen_id_percentages, get_functional_zones_scenario_id, get_services_geojson
+    get_all_physical_objects_geometries, get_functional_zones_scenario_id, get_services_geojson
 from ...exceptions.http_exception_wrapper import http_exception
 
 
 class PreProcessingService:
     @staticmethod
-    async def extract_physical_objects(scenario_id: int, is_context: bool, scenario_id_flag: bool = False) -> dict[
+    async def extract_physical_objects(scenario_id: int, is_context: bool) -> dict[
         str, gpd.GeoDataFrame]:
         """
-        Extracts and processes physical objects for a given project from GeoJson,
+        Extracts and processes physical objects for a given scenario from GeoJson,
         handling geometries and object attributes.
 
         Parameters:
-        project_id : int
-            The ID of the project for which physical objects are to be extracted.
+        scenario_id : int
+            The ID of the scenario for which physical objects are to be extracted.
         is_context : bool
             Flag indicating whether to fetch context-based data.
 
@@ -28,10 +27,7 @@ class PreProcessingService:
             Dictionary with processed GeoDataFrame with areas of water, green (grass) and forest objects.
         """
         logger.info("Loading physical objects")
-        if scenario_id_flag:
-            resp = await get_all_physical_objects_geometries_scen_id_percentages(scenario_id)
-        else:
-            resp = await get_all_physical_objects_geometries(scenario_id, is_context)
+        resp = await get_all_physical_objects_geometries(scenario_id, is_context)
 
         all_data: list[dict] = []
         for feature in resp.get("features", []):
@@ -130,14 +126,14 @@ class PreProcessingService:
         }
 
     @staticmethod
-    async def extract_landuse(scenario_id: int, is_context: bool, scenario_id_flag: bool = False, source: str = None, ) \
+    async def extract_landuse(scenario_id: int, is_context: bool, source: str = None, ) \
             -> gpd.GeoDataFrame:
         """
-        Extracts functional zones polygons for a given project and returns them as a GeoDataFrame.
+        Extracts functional zones polygons for a given scenario and returns them as a GeoDataFrame.
 
         Parameters:
-        project_id : int
-            The ID of the project for which land use data is to be extracted.
+        scenario_id : int
+            The ID of the scenario for which land use data is to be extracted.
         is_context : bool
             Flag to determine if context-specific functional zones should be fetched.
 
@@ -151,10 +147,7 @@ class PreProcessingService:
         ValueError
             If the input data is malformed or invalid.
         """
-        if scenario_id_flag:
-            geojson_data = await get_functional_zones_scen_id_percentages(scenario_id)
-        else:
-            geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context)
+        geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context, source)
         logger.info("Functional zones loading")
 
         features = geojson_data["features"]
@@ -370,11 +363,11 @@ class PreProcessingService:
     async def extract_landuse_from_territory(territory_id, source: str = None, ) \
             -> gpd.GeoDataFrame:
         """
-        Extracts functional zones polygons for a given project and returns them as a GeoDataFrame.
+        Extracts functional zones polygons for a given territory and returns them as a GeoDataFrame.
 
         Parameters:
-        project_id : int
-            The ID of the project for which land use data is to be extracted.
+        territory_id : int
+            The ID of the territory for which land use data is to be extracted.
         is_context : bool
             Flag to determine if context-specific functional zones should be fetched.
 
