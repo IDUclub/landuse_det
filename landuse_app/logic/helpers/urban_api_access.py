@@ -140,11 +140,10 @@ async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = 
     source = source_data["source"]
     year = source_data["year"]
 
-    endpoint = (
-        f"/api/v1/scenarios/{scenario_id}/context/functional_zones?year={year}&source={source}"
-        if is_context
-        else f"/api/v1/scenarios/{scenario_id}/functional_zones?year={year}&source={source}"
-    )
+    if is_context:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/context/functional_zones?year={year}&source={source}"
+    else:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zones?year={year}&source={source}"
 
     response = await urban_db_api.get(endpoint)
     if not response or "features" not in response or not response["features"]:
