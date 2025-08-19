@@ -83,9 +83,9 @@ async def get_projects_context_renovation_potential(
     "/scenarios/{scenario_id}/context/urbanization_level",
     response_model=GeoJSON,
     description=(
-            "Function for getting urbanization level for a project's context. "
+            "Function for getting urbanization level for a scenario's context. "
             "Additionally, returns layer in GeoJSON implemented in JSON response. "
-            "Args: project_id (int): unique identifier of the project. "
+            "Args: scenario_id (int): unique identifier of the scenario. "
             "Returns: GeoJSON: context urbanization level data."
     )
 )
