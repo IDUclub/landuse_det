@@ -609,7 +609,7 @@ async def calculate_zone_percentages(scenario_id: int, is_context: bool = False,
         dict: A dictionary with the percentages for each unique landuse zone.
     """
     physical_objects_dict, landuse_polygons = await asyncio.gather(
-        data_extraction.extract_physical_objects(scenario_id, is_context, True),
+        data_extraction.extract_physical_objects(scenario_id, is_context),
         data_extraction.extract_landuse(scenario_id, is_context, source)
     )
 
