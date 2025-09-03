@@ -85,25 +85,14 @@ def calculate_profiled_building_area(
 
 
 def calculate_total_building_area(buildings_in_zone, zone):
-    """
-    Calculates the percentage of the total building area relative to the zone's area.
-
-    Parameters:
-    buildings_in_zone (gpd.GeoDataFrame): Buildings that fall within the zone.
-    zone (gpd.GeoSeries): Polygonal zone.
-
-    Returns:
-    float: Percentage of the total building area.
-    """
-
-    if not hasattr(zone, "geometry") or not isinstance(zone.geometry, Polygon) or zone.geometry.area == 0:
-        return 0
-    zone_area = zone.geometry.area
+    geom = getattr(zone, "geometry", None)
+    if geom is None or not isinstance(geom, (Polygon, MultiPolygon)) or geom.area == 0:
+        return 0.0
+    zone_area = geom.area
     if buildings_in_zone.empty:
-        return 0
-
-    total_building_area = buildings_in_zone.geometry.area.sum()
-    return (total_building_area / zone_area * 100) if zone_area > 0 else 0
+        return 0.0
+    total_area = buildings_in_zone.geometry.area.sum()
+    return (total_area / zone_area * 100.0) if zone_area > 0 else 0.0
 
 
 async def assign_development_type(landuse_polygons: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -136,9 +125,9 @@ async def assign_development_type(landuse_polygons: gpd.GeoDataFrame) -> gpd.Geo
         (landuse_polygons["Процент профильных объектов"].isna()),
         (landuse_polygons["Процент профильных объектов"] == 0.0),
         (landuse_polygons["Процент профильных объектов"] < 10.00),
-        (landuse_polygons["Процент профильных объектов"] < 25.00),
-        (landuse_polygons["Процент профильных объектов"] < 75.00),
-        (landuse_polygons["Процент профильных объектов"] < 90.00),
+        (landuse_polygons["Процент профильных объектов"] < 15.00),
+        (landuse_polygons["Процент профильных объектов"] < 50.00),
+        (landuse_polygons["Процент профильных объектов"] < 70.00),
 
         (landuse_polygons["Процент профильных объектов"] >= 90.00),
     ]
@@ -151,9 +140,9 @@ async def assign_development_type(landuse_polygons: gpd.GeoDataFrame) -> gpd.Geo
         "Мало урбанизированная территория",  # данных нет или 0
         "Мало урбанизированная территория",
         "Мало урбанизированная территория",  # <10%
-        "Слабо урбанизированная территория",  # <25%
-        "Средне урбанизированная территория",  # <75%
-        "Хорошо урбанизированная территория",  # <90%
+        "Слабо урбанизированная территория",  # <15%
+        "Средне урбанизированная территория",  # <50%
+        "Хорошо урбанизированная территория",  # <70%
         "Высоко урбанизированная территория",  # >=90%
     ]
 
