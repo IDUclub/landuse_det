@@ -181,28 +181,16 @@ class IndicatorsService:
         Count cities on a territory by population size category and store the result.
 
         Depending on `indicator_id`, this routine will:
-          - 10: count "large" cities (population ≥ 100 000)
+          - 7:  count "super-large" cities (population > 3 000 000)
+          - 8:  count "largest" cities (1 000 000 ≤ population ≤ 3 000 000)
+          - 9:  count "large" cities (250 000 ≤ population < 1 000 000)
+          - 10: count "large+" cities (population ≥ 100 000)
           - 11: count "medium" cities (50 000 ≤ population < 100 000)
           - 12: count "small" cities (population <  50 000)
 
-        It always fetches the **population** values (indicator 10) for all child
+        It always fetches the **population** values (indicator 1) for all child
         territories marked as cities, then applies the appropriate threshold, and
         finally writes the count back under the given `indicator_id`.
-
-        Args:
-            territory_id (int):
-                ID of the parent territory to query city populations for.
-            indicator_id (int):
-                Which output indicator to write:
-                  - 10 large cities
-                  - 11 medium cities
-                  - 12 small cities
-            force_recalculate (bool):
-                If False, will first check for an existing stored value and return it
-                if present. Otherwise, always re‐compute and overwrite.
-
-        Returns:
-            dict: the API response from `put_indicator_value` for the stored count.
         """
         if not force_recalculate:
             existing = await check_indicator_exists(territory_id, indicator_id=indicator_id)
@@ -215,13 +203,24 @@ class IndicatorsService:
             "include_child_territories": "true",
             "last_only": "true",
         }
-        pop_values = await get_indicator_values(territory_id, indicator_id=10, params=params)
+        pop_values = await get_indicator_values(territory_id, indicator_id=1, params=params)
         values = [item.get("value", 0) for item in (pop_values or [])]
 
-        if indicator_id == 10:
+        if indicator_id == 7:
+            count = sum(1 for v in values if v > 3_000_000)
+
+        elif indicator_id == 8:
+            count = sum(1 for v in values if 1_000_000 <= v <= 3_000_000)
+
+        elif indicator_id == 9:
+            count = sum(1 for v in values if 250_000 <= v < 1_000_000)
+
+        elif indicator_id == 10:
             count = sum(1 for v in values if v >= 100_000)
+
         elif indicator_id == 11:
             count = sum(1 for v in values if 50_000 <= v < 100_000)
+
         elif indicator_id == 12:
             count = sum(1 for v in values if v < 50_000)
         else:

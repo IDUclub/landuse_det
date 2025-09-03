@@ -10,17 +10,10 @@ DEFAULT_RESIDENTIAL = {
     "landuse_zone": "Residential"
 }
 
-# zone_mapping = {
-#     "Residential": ["Жилой дом"],
-#     "Industrial": ["Промышленная территория"],
-#     "Transport": ["Железнодорожный вокзал", "Аэропорт"],
-#     "Business": ["Нежилое здание"],
-#     "Agriculture": ["Вспаханное поле", "Поле"],
-#     "Recreation": ["Травяное покрытие", "ООПТ", "Зелёная зона", "Парк"],
-# }
-
+#Dict of sources, appropriate for rquesting in Urban API
 VALID_SOURCES = {"PZZ", "OSM", "User"}
 
+#Physical objects needed for evaluation of functional zone effective usage
 actual_zone_mapping = {
     "Residential": [
         {"physical_object_type_id": 4.0,  "service_type_id": None, "physical_object_function_id": 1.0,  "urban_function_id": None}
@@ -46,3 +39,10 @@ actual_zone_mapping = {
         {"physical_object_type_id": None,   "service_type_id": 1.0,  "physical_object_function_id": None,  "urban_function_id": 2.0}
     ]
 }
+
+#Mapping of functional zones ids to their names
+ZONE_CLASS_BY_ID = {
+            1: "Residential", 2: "Recreation", 3: "Special", 4: "Industrial",
+            5: "Agriculture", 6: "Transport", 7: "Business",
+            10: "Residential", 11: "Residential", 14: "Unknown"
+        }
