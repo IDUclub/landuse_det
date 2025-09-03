@@ -619,7 +619,7 @@ async def calculate_zone_percentages(scenario_id: int, is_context: bool = False,
     utm_crs = landuse_polygons.estimate_utm_crs()
     landuse_polygons = landuse_polygons.to_crs(utm_crs)
 
-    landuse_polygons["landuse_zone"] = landuse_polygons["landuse_zone"].replace({None: "Residential", "null": "Residential"}).fillna("Residential")
+    landuse_polygons["landuse_zone"] = landuse_polygons["landuse_zone"].replace({None: "Unknown", "null": "Unknown"}).fillna("Unknown")
     landuse_polygons["area"] = landuse_polygons.geometry.area
     total_area_landuse = landuse_polygons["area"].sum()
 

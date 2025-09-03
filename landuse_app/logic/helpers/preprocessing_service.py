@@ -5,6 +5,7 @@ from loguru import logger
 from shapely.geometry import shape
 from .urban_api_access import get_functional_zones_territory_id, get_physical_objects_from_territory_parallel, \
     get_all_physical_objects_geometries, get_functional_zones_scenario_id, get_services_geojson
+from ..constants.constants import ZONE_CLASS_BY_ID
 from ...exceptions.http_exception_wrapper import http_exception
 
 
@@ -171,29 +172,25 @@ class PreProcessingService:
 
         if 'functional_zone_type' in landuse_polygons.columns:
             landuse_polygons['zone_type_id'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('id') if isinstance(x, dict) else None)
+                lambda x: x.get('id') if isinstance(x, dict) else None
+            )
             landuse_polygons['zone_type_name'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('name') if isinstance(x, dict) and x.get('name') != "unknown" else "residential"
+                lambda x: x.get('name') if isinstance(x, dict) else None
             )
             landuse_polygons['zone_type_nickname'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('nickname') if isinstance(x, dict) and x.get('nickname') != "unknown" else "Жилая зона"
+                lambda x: x.get('nickname') if isinstance(x, dict) else None
             )
 
-        if "territory" in landuse_polygons.columns:
-            landuse_polygons['zone_type_parent_territory_id'] = landuse_polygons['territory'].apply(
-                lambda x: x.get('id') if isinstance(x, dict) else None)
-            landuse_polygons['zone_type_parent_territory_name'] = landuse_polygons['territory'].apply(
-                lambda x: x.get('name') if isinstance(x, dict) else None)
-
-        landuse_polygons.drop(
-            columns=['properties', 'functional_zone_type', 'territory', 'created_at', 'updated_at', 'zone_type_name'],
-            inplace=True, errors='ignore'
+        landuse_polygons['landuse_zone'] = (
+            landuse_polygons['zone_type_id']
+            .map(ZONE_CLASS_BY_ID)
+            .fillna("Unknown")
         )
 
-        landuse_polygons.replace({
-            "zone_type_name": {"unknown": "residential"},
-            "zone_type_nickname": {"unknown": "Жилая зона"}
-        }, inplace=True)
+        landuse_polygons.drop(
+            columns=['functional_zone_type', 'properties', 'territory', 'created_at', 'updated_at'],
+            inplace=True, errors='ignore'
+        )
 
         logger.info("Functional zones are loaded")
         return landuse_polygons
