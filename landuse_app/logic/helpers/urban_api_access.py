@@ -90,30 +90,34 @@ async def _form_source_params(sources: list[dict]) -> dict:
     if len(sources) == 1:
         return sources[0]
 
-    source_names = [i["source"] for i in sources]
     source_data_df = pd.DataFrame(sources)
+    source_names = source_data_df["source"].unique()
 
-    if "OSM" in source_names:
-        return source_data_df.loc[
-            source_data_df[source_data_df["source"] == "OSM"]["year"].idxmax()
-        ].to_dict()
-
-    # if "OSM" in source_names:
-    #     osm_df = source_data_df[source_data_df["source"] == "OSM"]
-    #     if 2024 in osm_df["year"].values:
-    #         chosen = osm_df[osm_df["year"] == 2024].iloc[0]
-    #     else:
-    #         chosen = osm_df[osm_df["year"] < 2025].sort_values("year", ascending=False).iloc[0]
-    #     return chosen.to_dict()
+    if "User" in source_names:
+        return (
+            source_data_df[source_data_df["source"] == "User"]
+            .sort_values("year", ascending=False)
+            .iloc[0]
+            .to_dict()
+        )
 
     elif "PZZ" in source_names:
-        return source_data_df.loc[
-            source_data_df[source_data_df["source"] == "PZZ"]["year"].idxmax()
-        ].to_dict()
-    else:
-        return source_data_df.loc[
-            source_data_df[source_data_df["source"] == "User"]["year"].idxmax()
-        ].to_dict()
+        return (
+            source_data_df[source_data_df["source"] == "PZZ"]
+            .sort_values("year", ascending=False)
+            .iloc[0]
+            .to_dict()
+        )
+
+    elif "OSM" in source_names:
+        return (
+            source_data_df[source_data_df["source"] == "OSM"]
+            .sort_values("year", ascending=False)
+            .iloc[0]
+            .to_dict()
+        )
+
+    return source_data_df.sort_values("year", ascending=False).iloc[0].to_dict()
 
 
 async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = False, source: str = None) -> dict:
