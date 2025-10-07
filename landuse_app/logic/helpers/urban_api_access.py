@@ -93,6 +93,14 @@ async def _form_source_params(sources: list[dict]) -> dict:
     source_data_df = pd.DataFrame(sources)
     source_names = source_data_df["source"].unique()
 
+    if "Unknown Source" in source_names:
+        return (
+            source_data_df[source_data_df["source"] == "Unknown Source"]
+            .sort_values("year", ascending=False)
+            .iloc[0]
+            .to_dict()
+        )
+
     if "User" in source_names:
         return (
             source_data_df[source_data_df["source"] == "User"]
