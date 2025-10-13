@@ -48,7 +48,7 @@ async def get_projects_base_scenario_id(project_id: int) -> int:
             return scenario.get("scenario_id")
 
 
-async def get_functional_zone_sources(scenario_id: int, source: str = None) -> dict:
+async def get_functional_zone_sources(scenario_id: int, source: str = None, is_context: bool = False) -> dict:
     """
     Fetch available functional zone sources for a given scenario ID and determine the best source.
 
@@ -62,7 +62,11 @@ async def get_functional_zone_sources(scenario_id: int, source: str = None) -> d
     Raises:
     http_exception: If no sources are found or the specified source is not available.
     """
-    endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zone_sources"
+    if is_context:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/context/functional_zone_sources"
+    else:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zone_sources"
+
     response = await urban_db_api.get(endpoint)
 
     if not response:
@@ -144,7 +148,7 @@ async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = 
     http_exception: If the response is empty or the specified source is not available.
     """
     # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
-    source_data = await get_functional_zone_sources(scenario_id, source)
+    source_data = await get_functional_zone_sources(scenario_id, source, is_context)
 
     if not source_data or "source" not in source_data or "year" not in source_data:
         raise http_exception(404, "No valid source found for the given project ID", scenario_id)
