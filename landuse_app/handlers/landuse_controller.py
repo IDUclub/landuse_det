@@ -29,7 +29,11 @@ async def get_projects_renovation_potential(
     scenario_id: int = Path(..., description="The unique identifier of the scenario."),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
+    ),
+    year: int = Query(
+        None,
+        description="The year of the landuse zones data",
     ),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -38,7 +42,9 @@ async def get_projects_renovation_potential(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await landuse_service.get_renovation_potential(scenario_id, source=source)
+    return await landuse_service.get_renovation_potential(
+        scenario_id, source=source, year=year
+    )
 
 
 @urbanization_router.get(
@@ -55,7 +61,11 @@ async def get_projects_urbanization_level(
     scenario_id: int = Path(..., description="The unique identifier of the scenario."),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
+    ),
+    year: int = Query(
+        None,
+        description="The year of the landuse zones data",
     ),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -64,7 +74,9 @@ async def get_projects_urbanization_level(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await landuse_service.get_urbanization_level(scenario_id, source=source)
+    return await landuse_service.get_urbanization_level(
+        scenario_id, source=source, year=year
+    )
 
 
 @renovation_router.get(
@@ -81,7 +93,11 @@ async def get_projects_context_renovation_potential(
     scenario_id: int = Path(..., description="The unique identifier of the scenario."),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
+    ),
+    year: int = Query(
+        None,
+        description="The year of the landuse zones data",
     ),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -91,7 +107,7 @@ async def get_projects_context_renovation_potential(
             source,
         )
     return await landuse_service.get_context_renovation_potential(
-        scenario_id, source=source
+        scenario_id, source=source, year=year
     )
 
 
@@ -109,7 +125,11 @@ async def get_projects_context_urbanization_level(
     scenario_id: int = Path(..., description="The unique identifier of the scenario."),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
+    ),
+    year: int = Query(
+        None,
+        description="The year of the landuse zones data",
     ),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
@@ -119,7 +139,7 @@ async def get_projects_context_urbanization_level(
             source,
         )
     return await landuse_service.get_context_urbanization_level(
-        scenario_id, source=source
+        scenario_id, source=source, year=year
     )
 
 
@@ -136,7 +156,11 @@ async def get_project_landuse_parts(
     scenario_id: int = Path(..., description="The unique identifier of the scenario."),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
+    ),
+    year: int = Query(
+        None,
+        description="The year of the landuse zones data",
     ),
 ) -> dict:
     if source is not None and source not in VALID_SOURCES:
@@ -145,7 +169,9 @@ async def get_project_landuse_parts(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await landuse_service.get_project_landuse_parts(scenario_id, source=source)
+    return await landuse_service.get_project_landuse_parts(
+        scenario_id, source=source, year=year
+    )
 
 
 @indicators_router.post(
@@ -190,7 +216,7 @@ async def get_territory_urbanization_level(
     ),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Valid options: PZZ, OSM.",
+        description="The source of the landuse zones data. Valid options: User, PZZ, OSM.",
     ),
     force_recalculate: bool = Query(
         False,
@@ -369,7 +395,7 @@ async def recreation_area_indicator(
     ),
     source: str = Query(
         None,
-        description="The source of the landuse zones data. Available sources are: PZZ, OSM",
+        description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
     ),
 ):
     recreation_area = await IndicatorsService.recreation_area(

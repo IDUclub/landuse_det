@@ -650,7 +650,7 @@ async def filter_response(
 
 
 async def calculate_zone_percentages(
-    scenario_id: int, is_context: bool = False, source: str = None
+    scenario_id: int, is_context: bool = False, source: str = None, year: int = None
 ) -> dict:
     """
     Calculates the percentage of the total area occupied by each unique landuse zone,
@@ -659,13 +659,15 @@ async def calculate_zone_percentages(
     Args:
         scenario_id (int): ID of the project to process.
         is_context (bool): Whether to include contextual data.
+        source (str): The source of the functional zones data.
+        year (int): The year of the functional zones data.
 
     Returns:
         dict: A dictionary with the percentages for each unique landuse zone.
     """
     physical_objects_dict, landuse_polygons = await asyncio.gather(
         data_extraction.extract_physical_objects(scenario_id, is_context),
-        data_extraction.extract_landuse(scenario_id, is_context, source),
+        data_extraction.extract_landuse(scenario_id, is_context, source, year),
     )
 
     water_objects = physical_objects_dict["water_objects"]
@@ -746,11 +748,11 @@ async def calculate_zone_percentages(
 
 
 async def get_projects_renovation_potential(
-    scenario_id: int, source: str = None
+    scenario_id: int, source: str = None, year: int = None
 ) -> dict:
     """Calculate renovation potential for project and include discomfort as a separate key."""
     landuse_polygons = await get_renovation_potential(
-        scenario_id, is_context=False, source=source
+        scenario_id, is_context=False, source=source, year=year
     )
     discomfort_value = (
         round(landuse_polygons["Неудобия"].iloc[0], 2)
@@ -773,12 +775,12 @@ async def get_projects_renovation_potential(
 
 
 async def get_projects_urbanization_level(
-    scenario_id: int, source: str = None
+    scenario_id: int, source: str = None, year: int = None
 ) -> GeoJSON:
     """Calculate urbanization level for project."""
     logger.info(f"Calculating urbanization level for scenario {scenario_id}")
     landuse_polygons = await get_renovation_potential(
-        scenario_id, is_context=False, source=source
+        scenario_id, is_context=False, source=source, year=year
     )
     landuse_polygons = await interpretation_service.interpret_urbanization_value(
         landuse_polygons
@@ -791,12 +793,12 @@ async def get_projects_urbanization_level(
 
 
 async def get_projects_context_renovation_potential(
-    scenario_id: int, source: str = None
+    scenario_id: int, source: str = None, year: int = None
 ) -> dict:
     """Calculate renovation potential for project's context."""
     logger.info(f"Calculating renovation potential for project {scenario_id}")
     landuse_polygons = await get_renovation_potential(
-        scenario_id, is_context=True, source=source
+        scenario_id, is_context=True, source=source, year=year
     )
 
     discomfort_value = (
@@ -820,12 +822,12 @@ async def get_projects_context_renovation_potential(
 
 
 async def get_projects_context_urbanization_level(
-    scenario_id: int, source: str = None
+    scenario_id: int, source: str = None, year: int = None
 ) -> GeoJSON:
     """Calculate urbanization level for project's context."""
     logger.info(f"Calculating urbanization level for project {scenario_id}")
     landuse_polygons = await get_renovation_potential(
-        scenario_id, is_context=True, source=source
+        scenario_id, is_context=True, source=source, year=year
     )
     landuse_polygons = await interpretation_service.interpret_urbanization_value(
         landuse_polygons
@@ -838,8 +840,10 @@ async def get_projects_context_urbanization_level(
 
 
 async def get_projects_landuse_parts_scen_id_main_method(
-    scenario_id: int, source: str = None
+    scenario_id: int, source: str = None, year: int = None
 ) -> dict:
     logger.info(f"Calculating landuse parts for scenario {scenario_id}")
-    landuse_parts = await calculate_zone_percentages(scenario_id, source=source)
+    landuse_parts = await calculate_zone_percentages(
+        scenario_id, source=source, year=year
+    )
     return landuse_parts
