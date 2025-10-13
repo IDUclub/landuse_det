@@ -48,7 +48,7 @@ async def get_projects_base_scenario_id(project_id: int) -> int:
             return scenario.get("scenario_id")
 
 
-async def get_functional_zone_sources(scenario_id: int, source: str = None, is_context: bool = False) -> dict:
+async def get_functional_zone_sources(scenario_id: int, source: str = None, year: int = None, is_context: bool = False) -> dict:
     """
     Fetch available functional zone sources for a given scenario ID and determine the best source.
 
@@ -72,13 +72,27 @@ async def get_functional_zone_sources(scenario_id: int, source: str = None, is_c
     if not response:
         raise http_exception(404, f"No functional zone sources found for the given scenario ID", scenario_id)
 
-    if source:
-        source_data = next((s for s in response if s["source"] == source), None)
-        if not source_data:
-            raise http_exception(404, f"No data found for the specified source", source)
-        return source_data
+    filtered_sources = _filter_sources(response, source, year)
+
+    if filtered_sources:
+        return await _form_source_params(filtered_sources)
+
+    if source or year:
+        raise http_exception(404, f"No data found for the specified source or year", {"source": source, "year": year})
 
     return await _form_source_params(response)
+
+
+def _filter_sources(sources: list[dict], source: str | None, year: int | None) -> list[dict]:
+    filtered = sources
+
+    if source:
+        filtered = [s for s in filtered if s.get("source") == source]
+
+    if year:
+        filtered = [s for s in filtered if s.get("year") == year]
+
+    return filtered
 
 
 async def _form_source_params(sources: list[dict]) -> dict:
@@ -91,48 +105,28 @@ async def _form_source_params(sources: list[dict]) -> dict:
     Returns:
     dict: The most relevant source dictionary containing 'source' and 'year'.
     """
+    if not sources:
+        raise http_exception(404, "Нет доступных источников для выбора")
+
     if len(sources) == 1:
         return sources[0]
 
     source_data_df = pd.DataFrame(sources)
-    source_names = source_data_df["source"].unique()
+    source_priority = ["User", "PZZ", "OSM", "Unknown Source"]
 
-    if "Unknown Source" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "Unknown Source"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    if "User" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "User"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    elif "PZZ" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "PZZ"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    elif "OSM" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "OSM"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
+    for preferred_source in source_priority:
+        if preferred_source in source_data_df["source"].unique():
+            return (
+                source_data_df[source_data_df["source"] == preferred_source]
+                .sort_values("year", ascending=False)
+                .iloc[0]
+                .to_dict()
+            )
 
     return source_data_df.sort_values("year", ascending=False).iloc[0].to_dict()
 
 
-async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = False, source: str = None) -> dict:
+async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = False, source: str = None, year: int = None) -> dict:
     """
     Fetches functional zones for a project with an optional context flag and source selection.
 
@@ -148,7 +142,7 @@ async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = 
     http_exception: If the response is empty or the specified source is not available.
     """
     # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
-    source_data = await get_functional_zone_sources(scenario_id, source, is_context)
+    source_data = await get_functional_zone_sources(scenario_id, source, year, is_context)
 
     if not source_data or "source" not in source_data or "year" not in source_data:
         raise http_exception(404, "No valid source found for the given project ID", scenario_id)

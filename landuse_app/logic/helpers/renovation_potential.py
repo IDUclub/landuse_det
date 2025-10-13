@@ -400,7 +400,8 @@ async def get_renovation_potential(
     scenario_id: int,
     is_context: bool,
     profile: Optional[Profile] = None,
-    source: str = None
+    source: str = None,
+    year: str = None
 ) -> gpd.GeoDataFrame:
     """
     Calculate the renovation potential for a given project.
@@ -431,13 +432,16 @@ async def get_renovation_potential(
     profile_key = str(profile) if profile is not None else "no_profile"
 
     if source is None:
-        source_data = await get_functional_zone_sources(scenario_id)
+        source_data = await get_functional_zone_sources(scenario_id, is_context=is_context)
         source_key = source_data["source"]
+        year_key = source_data["year"]
     else:
         source_key = source
+        year_key = year
 
     cache_name = f"renovation_potential_project-{scenario_id}_is_context-{is_context}"
-    cache_file = caching_service.get_recent_cache_file(cache_name, {"profile": profile_key, "source": source_key})
+    cache_file = caching_service.get_recent_cache_file(cache_name,
+                                                       {"profile": profile_key, "source": source_key, "year": year_key})
 
     if cache_file and caching_service.is_cache_valid(cache_file):
         logger.info(f"Using cached renovation potential for scenario {scenario_id}")
@@ -446,7 +450,7 @@ async def get_renovation_potential(
 
     physical_objects_dict, landuse_polygons = await asyncio.gather(
         data_extraction.extract_physical_objects(scenario_id, is_context),
-        data_extraction.extract_landuse(scenario_id, is_context, source)
+        data_extraction.extract_landuse(scenario_id, is_context, source, year)
     )
     physical_objects = physical_objects_dict["physical_objects"]
     utm_crs = physical_objects.estimate_utm_crs()
@@ -505,7 +509,8 @@ async def get_renovation_potential(
         caching_service.save_with_cleanup(
             result_json, cache_name,
             {"profile": profile_key,
-             "source": source_key})
+             "source": source_key,
+             "year": year_key})
 
         return landuse_polygons_ren_pot
     else:
@@ -532,7 +537,8 @@ async def get_renovation_potential(
     caching_service.save_with_cleanup(
         result_json, cache_name,
         {"profile": profile_key,
-         "source": source_key})
+         "source": source_key,
+         "year": year_key})
 
     return landuse_polygons_ren_pot
 

@@ -127,7 +127,7 @@ class PreProcessingService:
         }
 
     @staticmethod
-    async def extract_landuse(scenario_id: int, is_context: bool, source: str = None, ) \
+    async def extract_landuse(scenario_id: int, is_context: bool, source: str = None, year: int = None) \
             -> gpd.GeoDataFrame:
         """
         Extracts functional zones polygons for a given scenario and returns them as a GeoDataFrame.
@@ -148,7 +148,7 @@ class PreProcessingService:
         ValueError
             If the input data is malformed or invalid.
         """
-        geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context, source)
+        geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context, source, year)
         logger.info("Functional zones loading")
 
         features = geojson_data["features"]
