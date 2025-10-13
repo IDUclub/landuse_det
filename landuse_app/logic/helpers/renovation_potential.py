@@ -492,28 +492,28 @@ async def get_renovation_potential(
     physical_objects = physical_objects.to_crs(utm_crs)
     landuse_polygons = landuse_polygons.to_crs(utm_crs)
 
-    logger.info("Функциональные зоны и физические объекты получены")
+    logger.info("Functional zones and physical objects are downloaded")
     landuse_polygons = landuse_polygons[
         landuse_polygons.geometry.type.isin(["Polygon", "MultiPolygon"])
     ]
     landuse_polygons["Процент профильных объектов"] = 0.0
     landuse_polygons["Любые здания /на зону"] = 0.0
-    logger.info("Функциональные зоны и физические объекты отфильтрованы")
+    logger.info("Functional zones and physical objects are filtered")
 
     landuse_polygons = await process_zones_with_bulk_update(
         landuse_polygons, physical_objects, actual_zone_mapping
     )
-    logger.info("Проценты зданий посчитаны")
+    logger.info("Buildings percentages are calculated")
 
     landuse_polygons = await assign_development_type(landuse_polygons)
-    logger.info("Уровень урбанизации присвоен")
+    logger.info("Urbanization level have been assigned")
 
     profile_for_analysis = str(profile) if profile is not None else None
 
     landuse_polygons_ren_pot = await analyze_geojson_for_renovation_potential(
         landuse_polygons, profile_for_analysis
     )
-    logger.info("Потенциал для реновации рассчитан")
+    logger.info("Renovation potential have been calculated")
 
     zones = landuse_polygons_ren_pot.to_crs(utm_crs)
     zones["Converted"] = None
