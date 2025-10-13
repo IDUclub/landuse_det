@@ -29,9 +29,7 @@ class TimeOutError(BaseError):
         if self.message:
             return "TimeOutError, {0} ".format(self.message)
         else:
-            return (
-                "Timeout time exceeded:("
-            )
+            return "Timeout time exceeded:("
 
 
 class NoDataError(BaseError):

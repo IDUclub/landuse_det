@@ -2,6 +2,7 @@ import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
+
 from loguru import logger
 
 from landuse_app import config
@@ -83,6 +84,7 @@ class CachingService:
         self.clean_cache(name, params)
         file_path = self.get_cache_file_path(name, params)
         self.save_cache(data, file_path)
+
 
 cache_enabled = config.get_bool("CACHE_ENABLED")  # должен вернуть True или False
 caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)

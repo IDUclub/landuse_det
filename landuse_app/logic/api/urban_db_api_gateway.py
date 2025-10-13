@@ -1,6 +1,7 @@
-import time
-import aiohttp
 import logging
+import time
+
+import aiohttp
 import jwt
 from fastapi import HTTPException
 
@@ -21,16 +22,20 @@ class AuthService:
             payload = {
                 "token": token,
                 "token_type_hint": "access_token",
-                "client_id": "unknown_client"
+                "client_id": "unknown_client",
             }
             headers = {
                 "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded"
+                "Content-Type": "application/x-www-form-urlencoded",
             }
-            async with sess.post(self.introspect_url, data=payload, headers=headers) as resp:
+            async with sess.post(
+                self.introspect_url, data=payload, headers=headers
+            ) as resp:
                 if resp.status == 200:
                     return (await resp.json()).get("active", False)
-                logger.warning("Introspect failed %s: %s", resp.status, await resp.text())
+                logger.warning(
+                    "Introspect failed %s: %s", resp.status, await resp.text()
+                )
                 return False
 
     async def _refresh(self, refresh_token: str) -> dict:
@@ -38,13 +43,15 @@ class AuthService:
             payload = {
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
-                "client_id": "unknown_client"
+                "client_id": "unknown_client",
             }
             headers = {
                 "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded"
+                "Content-Type": "application/x-www-form-urlencoded",
             }
-            async with sess.post(self.refresh_url, data=payload, headers=headers) as resp:
+            async with sess.post(
+                self.refresh_url, data=payload, headers=headers
+            ) as resp:
                 text = await resp.text()
                 if resp.status != 200:
                     logger.error("Refresh token failed %s: %s", resp.status, text)
@@ -65,11 +72,11 @@ class AuthService:
                 "grant_type": "password",
                 "username": username,
                 "password": password,
-                "client_id": "unknown_client"
+                "client_id": "unknown_client",
             }
             headers = {
                 "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded"
+                "Content-Type": "application/x-www-form-urlencoded",
             }
             async with sess.post(self.token_url, data=payload, headers=headers) as resp:
                 text = await resp.text()
@@ -110,7 +117,9 @@ class AuthService:
                 tokens = await self._refresh(refresh)
             except HTTPException as e:
                 if "Signature has expired" in e.detail:
-                    logger.info("Server: refresh token expired, falling back to password grant")
+                    logger.info(
+                        "Server: refresh token expired, falling back to password grant"
+                    )
                     tokens = await self._password_grant()
                 else:
                     raise
@@ -127,8 +136,10 @@ class UrbanDbAPI:
         self.auth = auth_service
         self.cache = cache_service
 
-    async def _prepare_headers(self, use_token: bool = True, override_token: str | None = None) -> dict:
-        headers: dict[str,str] = {}
+    async def _prepare_headers(
+        self, use_token: bool = True, override_token: str | None = None
+    ) -> dict:
+        headers: dict[str, str] = {}
         if override_token:
             headers["Authorization"] = f"Bearer {override_token}"
         elif use_token:
@@ -136,7 +147,9 @@ class UrbanDbAPI:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    async def get(self, path: str, params: dict = None, ignore_404: bool = False) -> dict | None:
+    async def get(
+        self, path: str, params: dict = None, ignore_404: bool = False
+    ) -> dict | None:
         headers = await self._prepare_headers()
         key = path.strip("/").replace("/", "_")
         if self.cache:
@@ -195,5 +208,5 @@ auth_svc = AuthService(auth_base_url=config.get("AUTH_SERVICE_URL"))
 urban_db_api = UrbanDbAPI(
     api_base=config.get("URBAN_API"),
     auth_service=auth_svc,
-    cache_service=caching_service
+    cache_service=caching_service,
 )

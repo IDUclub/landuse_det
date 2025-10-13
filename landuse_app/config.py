@@ -1,6 +1,8 @@
-from pathlib import Path
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
 
 class ApplicationConfig:
     def __init__(self):
@@ -29,4 +31,3 @@ class ApplicationConfig:
 
 
 config = ApplicationConfig()
-

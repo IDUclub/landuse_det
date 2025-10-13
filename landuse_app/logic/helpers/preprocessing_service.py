@@ -1,18 +1,26 @@
 import random
+
 import geopandas as gpd
 import pandas as pd
 from loguru import logger
 from shapely.geometry import shape
-from .urban_api_access import get_functional_zones_territory_id, get_physical_objects_from_territory_parallel, \
-    get_all_physical_objects_geometries, get_functional_zones_scenario_id, get_services_geojson
-from ..constants.constants import ZONE_CLASS_BY_ID
+
 from ...exceptions.http_exception_wrapper import http_exception
+from ..constants.constants import ZONE_CLASS_BY_ID
+from .urban_api_access import (
+    get_all_physical_objects_geometries,
+    get_functional_zones_scenario_id,
+    get_functional_zones_territory_id,
+    get_physical_objects_from_territory_parallel,
+    get_services_geojson,
+)
 
 
 class PreProcessingService:
     @staticmethod
-    async def extract_physical_objects(scenario_id: int, is_context: bool) -> dict[
-        str, gpd.GeoDataFrame]:
+    async def extract_physical_objects(
+        scenario_id: int, is_context: bool
+    ) -> dict[str, gpd.GeoDataFrame]:
         """
         Extracts and processes physical objects for a given scenario from GeoJson,
         handling geometries and object attributes.
@@ -48,7 +56,9 @@ class PreProcessingService:
             for phys in props.get("physical_objects", []):
                 base = {
                     "physical_object_id": phys.get("physical_object_id"),
-                    "object_type": phys.get("physical_object_type", {}).get("name", "Unknown"),
+                    "object_type": phys.get("physical_object_type", {}).get(
+                        "name", "Unknown"
+                    ),
                     "object_type_id": phys.get("physical_object_type", {}).get("id"),
                     "name": phys.get("name", "(unnamed)"),
                     "geometry_type": geom.geom_type,
@@ -78,12 +88,15 @@ class PreProcessingService:
                     else:
                         final_floors = random.randint(2, 5)
 
-                    base.update({
-                        "category": "residential",
-                        "storeys_count": final_floors,
-                        "living_area": b_props.get("living_area_official") or b_props.get("living_area_modeled"),
-                        "address": b_props.get("address", props.get("address")),
-                    })
+                    base.update(
+                        {
+                            "category": "residential",
+                            "storeys_count": final_floors,
+                            "living_area": b_props.get("living_area_official")
+                            or b_props.get("living_area_modeled"),
+                            "address": b_props.get("address", props.get("address")),
+                        }
+                    )
                     all_data.append(base)
                     continue
 
@@ -96,13 +109,15 @@ class PreProcessingService:
                         cap_real = svc.get("is_capacity_real")
 
                         row = base.copy()
-                        row.update({
-                            "category": "non_residential",
-                            "service_id": sid,
-                            "service_name": sname,
-                            "is_capacity_real": cap_real,
-                            "object_type": sname,
-                        })
+                        row.update(
+                            {
+                                "category": "non_residential",
+                                "service_id": sid,
+                                "service_name": sname,
+                                "is_capacity_real": cap_real,
+                                "object_type": sname,
+                            }
+                        )
                         all_data.append(row)
                     continue
 
@@ -111,24 +126,29 @@ class PreProcessingService:
 
         logger.info("Physical objects loaded")
         df = pd.DataFrame(all_data)
-        gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326").drop_duplicates("physical_object_id")
+        gdf = gpd.GeoDataFrame(
+            df, geometry="geometry", crs="EPSG:4326"
+        ).drop_duplicates("physical_object_id")
         gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
 
         local_crs = gdf.estimate_utm_crs()
-        water = gdf[gdf['object_type_id'].isin([45, 2, 44])].to_crs(local_crs).area.sum()
-        green = gdf[gdf['object_type_id'].isin([47, 3])].to_crs(local_crs).area.sum()
-        forests = gdf[gdf['object_type_id'].isin([48])].to_crs(local_crs).area.sum()
+        water = (
+            gdf[gdf["object_type_id"].isin([45, 2, 44])].to_crs(local_crs).area.sum()
+        )
+        green = gdf[gdf["object_type_id"].isin([47, 3])].to_crs(local_crs).area.sum()
+        forests = gdf[gdf["object_type_id"].isin([48])].to_crs(local_crs).area.sum()
 
         return {
             "physical_objects": gdf,
             "water_objects": water,
             "green_objects": green,
-            "forests": forests
+            "forests": forests,
         }
 
     @staticmethod
-    async def extract_landuse(scenario_id: int, is_context: bool, source: str = None, year: int = None) \
-            -> gpd.GeoDataFrame:
+    async def extract_landuse(
+        scenario_id: int, is_context: bool, source: str = None, year: int = None
+    ) -> gpd.GeoDataFrame:
         """
         Extracts functional zones polygons for a given scenario and returns them as a GeoDataFrame.
 
@@ -148,7 +168,9 @@ class PreProcessingService:
         ValueError
             If the input data is malformed or invalid.
         """
-        geojson_data = await get_functional_zones_scenario_id(scenario_id, is_context, source, year)
+        geojson_data = await get_functional_zones_scenario_id(
+            scenario_id, is_context, source, year
+        )
         logger.info("Functional zones loading")
 
         features = geojson_data["features"]
@@ -164,32 +186,40 @@ class PreProcessingService:
                 geometries.append(None)
 
         properties = [feature["properties"] for feature in features]
-        landuse_polygons = gpd.GeoDataFrame(properties, geometry=geometries, crs="EPSG:4326")
+        landuse_polygons = gpd.GeoDataFrame(
+            properties, geometry=geometries, crs="EPSG:4326"
+        )
 
-        if 'properties' in landuse_polygons.columns:
-            landuse_polygons['landuse_zone'] = landuse_polygons['properties'].apply(
-                lambda x: x.get('landuse_zon') if isinstance(x, dict) else None)
-
-        if 'functional_zone_type' in landuse_polygons.columns:
-            landuse_polygons['zone_type_id'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('id') if isinstance(x, dict) else None
-            )
-            landuse_polygons['zone_type_name'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('name') if isinstance(x, dict) else None
-            )
-            landuse_polygons['zone_type_nickname'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('nickname') if isinstance(x, dict) else None
+        if "properties" in landuse_polygons.columns:
+            landuse_polygons["landuse_zone"] = landuse_polygons["properties"].apply(
+                lambda x: x.get("landuse_zon") if isinstance(x, dict) else None
             )
 
-        landuse_polygons['landuse_zone'] = (
-            landuse_polygons['zone_type_id']
-            .map(ZONE_CLASS_BY_ID)
-            .fillna("Unknown")
+        if "functional_zone_type" in landuse_polygons.columns:
+            landuse_polygons["zone_type_id"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(lambda x: x.get("id") if isinstance(x, dict) else None)
+            landuse_polygons["zone_type_name"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(lambda x: x.get("name") if isinstance(x, dict) else None)
+            landuse_polygons["zone_type_nickname"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(lambda x: x.get("nickname") if isinstance(x, dict) else None)
+
+        landuse_polygons["landuse_zone"] = (
+            landuse_polygons["zone_type_id"].map(ZONE_CLASS_BY_ID).fillna("Unknown")
         )
 
         landuse_polygons.drop(
-            columns=['functional_zone_type', 'properties', 'territory', 'created_at', 'updated_at'],
-            inplace=True, errors='ignore'
+            columns=[
+                "functional_zone_type",
+                "properties",
+                "territory",
+                "created_at",
+                "updated_at",
+            ],
+            inplace=True,
+            errors="ignore",
         )
 
         logger.info("Functional zones are loaded")
@@ -233,7 +263,9 @@ class PreProcessingService:
         object_data = {
             "physical_object_id": obj.get("physical_object_id"),
             "object_type": obj.get("physical_object_type", {}).get("name", "Unknown"),
-            "object_type_id": obj.get("physical_object_type", {}).get("physical_object_type_id"),
+            "object_type_id": obj.get("physical_object_type", {}).get(
+                "physical_object_type_id"
+            ),
             "name": obj.get("name", "(unnamed)"),
             "geometry_type": shp.geom_type,
             "geometry": shp,
@@ -266,14 +298,16 @@ class PreProcessingService:
             else:
                 final_floors = random.randint(2, 5)
 
-            object_data.update({
-                "category": "residential",
-                "storeys_count": final_floors,
-                "living_area": (
+            object_data.update(
+                {
+                    "category": "residential",
+                    "storeys_count": final_floors,
+                    "living_area": (
                         building_props.get("living_area_official")
                         or building_props.get("living_area_modeled")
-                ),
-            })
+                    ),
+                }
+            )
 
         services = obj.get("services", [])
         if services:
@@ -285,36 +319,39 @@ class PreProcessingService:
                 cap_real = svc.get("is_capacity_real")
 
                 row = object_data.copy()
-                row.update({
-                    "category": "non_residential",
-                    "service_id": sid,
-                    "service_name": sname,
-                    "is_capacity_real": cap_real,
-                    "object_type": sname,
-                })
+                row.update(
+                    {
+                        "category": "non_residential",
+                        "service_id": sid,
+                        "service_name": sname,
+                        "is_capacity_real": cap_real,
+                        "object_type": sname,
+                    }
+                )
                 parsed.append(row)
-
 
         return [object_data]
 
     @staticmethod
-    async def extract_physical_objects_from_territory(territory_id: int) -> dict[str, gpd.GeoDataFrame]:
+    async def extract_physical_objects_from_territory(
+        territory_id: int,
+    ) -> dict[str, gpd.GeoDataFrame]:
         """
-            Extracts and processes physical objects for a given territory using parallel API requests.
+        Extracts and processes physical objects for a given territory using parallel API requests.
 
-            This function:
-              - Fetches physical objects with geometry for the specified territory via parallel paginated requests.
-              - Parses each object, extracting relevant attributes and geometry.
-              - Builds a GeoDataFrame from the parsed objects.
-              - Separates water bodies, green areas, and forests for area calculations.
+        This function:
+          - Fetches physical objects with geometry for the specified territory via parallel paginated requests.
+          - Parses each object, extracting relevant attributes and geometry.
+          - Builds a GeoDataFrame from the parsed objects.
+          - Separates water bodies, green areas, and forests for area calculations.
 
-            Returns:
-                dict[str, gpd.GeoDataFrame]: A dictionary containing:
-                    - "physical_objects": GeoDataFrame of all valid physical objects
-                    - "water_objects": total area of water objects (in square meters)
-                    - "green_objects": total area of green objects (in square meters)
-                    - "forests": total area of forest objects (in square meters)
-            """
+        Returns:
+            dict[str, gpd.GeoDataFrame]: A dictionary containing:
+                - "physical_objects": GeoDataFrame of all valid physical objects
+                - "water_objects": total area of water objects (in square meters)
+                - "green_objects": total area of green objects (in square meters)
+                - "forests": total area of forest objects (in square meters)
+        """
         logger.info("Physical objects are loading with parallel processing")
         raw_objects = await get_physical_objects_from_territory_parallel(territory_id)
         all_data = []
@@ -323,42 +360,54 @@ class PreProcessingService:
             parsed_objects = PreProcessingService.parse_physical_object(obj)
             all_data.extend(parsed_objects)
         if not all_data:
-            raise http_exception(404, "No physical objects found for territory ID", territory_id)
+            raise http_exception(
+                404, "No physical objects found for territory ID", territory_id
+            )
 
         logger.success("Physical objects are loaded, creating the  GeoDataFrame")
         all_data_df = pd.DataFrame(all_data)
-        all_data_gdf = gpd.GeoDataFrame(all_data_df, geometry="geometry", crs="EPSG:4326")
-        all_data_gdf = all_data_gdf.drop_duplicates(subset='physical_object_id')
-        all_data_gdf = all_data_gdf.dropna(subset=['geometry'])
-        all_data_gdf = all_data_gdf[all_data_gdf.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+        all_data_gdf = gpd.GeoDataFrame(
+            all_data_df, geometry="geometry", crs="EPSG:4326"
+        )
+        all_data_gdf = all_data_gdf.drop_duplicates(subset="physical_object_id")
+        all_data_gdf = all_data_gdf.dropna(subset=["geometry"])
+        all_data_gdf = all_data_gdf[
+            all_data_gdf.geometry.type.isin(["Polygon", "MultiPolygon"])
+        ]
         all_data_gdf = all_data_gdf[all_data_gdf.geometry.is_valid]
         if len(all_data_gdf) < 1:
-            raise http_exception(404, "No polygonal physical objects found for territory ID", territory_id)
+            raise http_exception(
+                404,
+                "No polygonal physical objects found for territory ID",
+                territory_id,
+            )
         local_crs = all_data_gdf.estimate_utm_crs()
 
         water_objects_gdf = all_data_gdf[
-            all_data_gdf['object_type_id'].isin([45, 2, 44])
+            all_data_gdf["object_type_id"].isin([45, 2, 44])
         ].to_crs(local_crs)
 
         green_objects_gdf = all_data_gdf[
-            all_data_gdf['object_type_id'].isin([47, 3])
+            all_data_gdf["object_type_id"].isin([47, 3])
         ].to_crs(local_crs)
 
-        forests_gdf = all_data_gdf[
-            all_data_gdf['object_type_id'].isin([48])
-        ].to_crs(local_crs)
+        forests_gdf = all_data_gdf[all_data_gdf["object_type_id"].isin([48])].to_crs(
+            local_crs
+        )
 
         logger.success("Physical objects are successfully loaded into GeoDataFrame")
         return {
             "physical_objects": all_data_gdf,
             "water_objects": water_objects_gdf.area.sum(),
             "green_objects": green_objects_gdf.area.sum(),
-            "forests": forests_gdf.area.sum()
+            "forests": forests_gdf.area.sum(),
         }
 
     @staticmethod
-    async def extract_landuse_from_territory(territory_id, source: str = None, ) \
-            -> gpd.GeoDataFrame:
+    async def extract_landuse_from_territory(
+        territory_id,
+        source: str = None,
+    ) -> gpd.GeoDataFrame:
         """
         Extracts functional zones polygons for a given territory and returns them as a GeoDataFrame.
 
@@ -394,50 +443,80 @@ class PreProcessingService:
                 geometries.append(None)
 
         properties = [feature["properties"] for feature in features]
-        landuse_polygons = gpd.GeoDataFrame(properties, geometry=geometries, crs="EPSG:4326")
+        landuse_polygons = gpd.GeoDataFrame(
+            properties, geometry=geometries, crs="EPSG:4326"
+        )
 
-        if 'properties' in landuse_polygons.columns:
-            landuse_polygons['landuse_zone'] = landuse_polygons['properties'].apply(
-                lambda x: x.get('landuse_zon') if isinstance(x, dict) else None)
-
-        if 'functional_zone_type' in landuse_polygons.columns:
-            landuse_polygons['zone_type_id'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('id') if isinstance(x, dict) else None)
-            landuse_polygons['zone_type_name'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('name') if isinstance(x, dict) and x.get('name') != "unknown" else "residential"
+        if "properties" in landuse_polygons.columns:
+            landuse_polygons["landuse_zone"] = landuse_polygons["properties"].apply(
+                lambda x: x.get("landuse_zon") if isinstance(x, dict) else None
             )
-            landuse_polygons['zone_type_nickname'] = landuse_polygons['functional_zone_type'].apply(
-                lambda x: x.get('nickname') if isinstance(x, dict) and x.get('nickname') != "unknown" else "Жилая зона"
+
+        if "functional_zone_type" in landuse_polygons.columns:
+            landuse_polygons["zone_type_id"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(lambda x: x.get("id") if isinstance(x, dict) else None)
+            landuse_polygons["zone_type_name"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(
+                lambda x: (
+                    x.get("name")
+                    if isinstance(x, dict) and x.get("name") != "unknown"
+                    else "residential"
+                )
+            )
+            landuse_polygons["zone_type_nickname"] = landuse_polygons[
+                "functional_zone_type"
+            ].apply(
+                lambda x: (
+                    x.get("nickname")
+                    if isinstance(x, dict) and x.get("nickname") != "unknown"
+                    else "Жилая зона"
+                )
             )
 
         if "territory" in landuse_polygons.columns:
-            landuse_polygons['zone_type_parent_territory_id'] = landuse_polygons['territory'].apply(
-                lambda x: x.get('id') if isinstance(x, dict) else None)
-            landuse_polygons['zone_type_parent_territory_name'] = landuse_polygons['territory'].apply(
-                lambda x: x.get('name') if isinstance(x, dict) else None)
+            landuse_polygons["zone_type_parent_territory_id"] = landuse_polygons[
+                "territory"
+            ].apply(lambda x: x.get("id") if isinstance(x, dict) else None)
+            landuse_polygons["zone_type_parent_territory_name"] = landuse_polygons[
+                "territory"
+            ].apply(lambda x: x.get("name") if isinstance(x, dict) else None)
 
         landuse_polygons.drop(
-            columns=['properties', 'functional_zone_type', 'territory', 'created_at', 'updated_at', 'zone_type_name'],
-            inplace=True, errors='ignore'
+            columns=[
+                "properties",
+                "functional_zone_type",
+                "territory",
+                "created_at",
+                "updated_at",
+                "zone_type_name",
+            ],
+            inplace=True,
+            errors="ignore",
         )
 
-        landuse_polygons.replace({
-            "zone_type_name": {"unknown": "residential"},
-            "zone_type_nickname": {"unknown": "Жилая зона"}
-        }, inplace=True)
+        landuse_polygons.replace(
+            {
+                "zone_type_name": {"unknown": "residential"},
+                "zone_type_nickname": {"unknown": "Жилая зона"},
+            },
+            inplace=True,
+        )
 
-        if 'landuse_zon' in landuse_polygons.columns:
-            landuse_polygons.rename(columns={'landuse_zon': 'landuse_zone'}, inplace=True)
+        if "landuse_zon" in landuse_polygons.columns:
+            landuse_polygons.rename(
+                columns={"landuse_zon": "landuse_zone"}, inplace=True
+            )
 
-        if 'landuse_zone' not in landuse_polygons.columns:
-            landuse_polygons['landuse_zone'] = 'Residential'
+        if "landuse_zone" not in landuse_polygons.columns:
+            landuse_polygons["landuse_zone"] = "Residential"
         logger.success("Functional zones are loaded")
         return landuse_polygons
 
     @staticmethod
     async def extract_services(
-            territory_id: int,
-            service_type_ids=None
+        territory_id: int, service_type_ids=None
     ) -> gpd.GeoDataFrame:
         """
         Retrieve and flatten service features for the specified territory and service types.
@@ -472,7 +551,9 @@ class PreProcessingService:
 
         if not all_features:
             gdf = gpd.GeoDataFrame()
-            logger.warning(f"No services found for territory {territory_id} and service types {service_type_ids}")
+            logger.warning(
+                f"No services found for territory {territory_id} and service types {service_type_ids}"
+            )
             return gdf
 
         records = []
@@ -490,30 +571,31 @@ class PreProcessingService:
             territories = props.pop("territories", [])
             terr = territories[0] if territories else {}
 
-            flat = {"service_name": props.get("name"),
-                    "capacity": props.get("capacity"),
-                    "service_type_id": svc_type.get("service_type_id"), "service_type_name": svc_type.get("name"),
-                    **{k: v for k, v in props.get("properties", {}).items()
-                       if k not in ("name", "is_capacity_real")}, "geometry": geom}
+            flat = {
+                "service_name": props.get("name"),
+                "capacity": props.get("capacity"),
+                "service_type_id": svc_type.get("service_type_id"),
+                "service_type_name": svc_type.get("name"),
+                **{
+                    k: v
+                    for k, v in props.get("properties", {}).items()
+                    if k not in ("name", "is_capacity_real")
+                },
+                "geometry": geom,
+            }
 
             records.append(flat)
 
         df = pd.DataFrame(records)
         gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
         gdf = gdf.to_crs(gdf.estimate_utm_crs())
-        gdf = gdf[gdf.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+        gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
         gdf = gdf.drop(
-            columns=[
-                'osm_id',
-                'full_id',
-                'leisure',
-                'osm_type',
-                'capacity',
-                'fid'
-            ],
-            errors='ignore'
+            columns=["osm_id", "full_id", "leisure", "osm_type", "capacity", "fid"],
+            errors="ignore",
         )
 
         return gdf
+
 
 data_extraction = PreProcessingService()

@@ -1,21 +1,19 @@
+import asyncio
 from typing import Union
 
 import geopandas as gpd
-import asyncio
-
 import numpy as np
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
 from shapely.geometry.base import BaseGeometry
-from shapely.wkt import loads, dumps
+from shapely.wkt import dumps, loads
 
 
 class SpatialMethods:
     @staticmethod
     async def round_coords_geom(
-            geometry: gpd.GeoSeries | BaseGeometry,
-            ndigits: int = 5
+        geometry: gpd.GeoSeries | BaseGeometry, ndigits: int = 5
     ) -> gpd.GeoSeries:
         """
         Rounds geometry coordinates to the specified precision.
@@ -28,8 +26,7 @@ class SpatialMethods:
             A GeoSeries with rounded geometries.
         """
         return await asyncio.to_thread(
-            geometry.map,
-            lambda geom: loads(dumps(geom, rounding_precision=ndigits))
+            geometry.map, lambda geom: loads(dumps(geom, rounding_precision=ndigits))
         )
 
     @staticmethod
@@ -70,15 +67,17 @@ class SpatialMethods:
         if isinstance(data, dict) and data.get("type") == "FeatureCollection":
             features = data.get("features", [])
         elif isinstance(data, dict) and "geometry" in data:
-            features = [{
-                "type": "Feature",
-                "geometry": data["geometry"],
-                "properties": {
-                    **data.get("properties", {}),
-                    "project": data.get("project"),
-                    "project_territory_id": data.get("project_territory_id"),
+            features = [
+                {
+                    "type": "Feature",
+                    "geometry": data["geometry"],
+                    "properties": {
+                        **data.get("properties", {}),
+                        "project": data.get("project"),
+                        "project_territory_id": data.get("project_territory_id"),
+                    },
                 }
-            }]
+            ]
         else:
             raise ValueError("to_project_gdf: Unsupported input format")
 
@@ -87,10 +86,16 @@ class SpatialMethods:
 
         if "project" in gdf.columns:
             gdf["scenario_id"] = gdf["project"].apply(
-                lambda p: p.get("base_scenario", {}).get("id") if isinstance(p, dict) else None
+                lambda p: (
+                    p.get("base_scenario", {}).get("id")
+                    if isinstance(p, dict)
+                    else None
+                )
             )
             gdf["territory_id"] = gdf["project"].apply(
-                lambda p: (p.get("region") or {}).get("id") if isinstance(p, dict) else None
+                lambda p: (
+                    (p.get("region") or {}).get("id") if isinstance(p, dict) else None
+                )
             )
         elif "base_scenario" in gdf.columns and "territory" in gdf.columns:
             gdf["scenario_id"] = gdf["base_scenario"].apply(
@@ -100,6 +105,8 @@ class SpatialMethods:
                 lambda d: d.get("id") if isinstance(d, dict) else None
             )
         else:
-            raise ValueError("to_project_gdf: Cannot find scenario_id/territory_id in the data")
+            raise ValueError(
+                "to_project_gdf: Cannot find scenario_id/territory_id in the data"
+            )
 
         return gdf
