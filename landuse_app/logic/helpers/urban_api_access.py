@@ -20,7 +20,7 @@ async def get_projects_territory(project_id: int) -> dict:
     """
     endpoint = f"/api/v1/projects/{project_id}/territory"
     headers = {
-        "Authorization": f"Bearer {config.get("ACCESS_TOKEN")}"""
+        "Authorization": f"Bearer {config.get('ACCESS_TOKEN')}"""
     }
     response = await urban_db_api.get(endpoint)
 
@@ -48,7 +48,11 @@ async def get_projects_base_scenario_id(project_id: int) -> int:
             return scenario.get("scenario_id")
 
 
-async def get_functional_zone_sources(scenario_id: int, source: str = None) -> dict:
+async def get_functional_zone_sources(
+    scenario_id: int,
+    source: str | None = None,
+    year: int | None = None
+) -> dict:
     """
     Fetch available functional zone sources for a given scenario ID and determine the best source.
 
@@ -66,64 +70,49 @@ async def get_functional_zone_sources(scenario_id: int, source: str = None) -> d
     response = await urban_db_api.get(endpoint)
 
     if not response:
-        raise http_exception(404, f"No functional zone sources found for the given scenario ID", scenario_id)
+        raise http_exception(404, f"Data not found for scenario", scenario_id)
 
-    if source:
-        source_data = next((s for s in response if s["source"] == source), None)
-        if not source_data:
-            raise http_exception(404, f"No data found for the specified source", source)
-        return source_data
+    filtered_sources = _filter_sources(response, source, year)
+
+    if filtered_sources:
+        return await _form_source_params(filtered_sources)
+
+    if source or year:
+        raise http_exception(404, f"Data not found for scenario {scenario_id}", {"source": source, "year": year})
 
     return await _form_source_params(response)
 
 
+def _filter_sources(sources: list[dict], source: str | None, year: int | None) -> list[dict]:
+    filtered = sources
+
+    if source:
+        filtered = [s for s in filtered if s.get("source") == source]
+
+    if year:
+        filtered = [s for s in filtered if s.get("year") == year]
+
+    return filtered
+
+
 async def _form_source_params(sources: list[dict]) -> dict:
-    """
-    Determine the most relevant functional zone source from the available sources.
+    if not sources:
+        raise http_exception(404, "No sources are available to choose from")
 
-    Parameters:
-    sources (list[dict]): List of available sources.
-
-    Returns:
-    dict: The most relevant source dictionary containing 'source' and 'year'.
-    """
     if len(sources) == 1:
         return sources[0]
 
     source_data_df = pd.DataFrame(sources)
-    source_names = source_data_df["source"].unique()
+    source_priority = ["Unknown Source", "User", "PZZ", "OSM"]
 
-    if "Unknown Source" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "Unknown Source"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    if "User" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "User"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    elif "PZZ" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "PZZ"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
-
-    elif "OSM" in source_names:
-        return (
-            source_data_df[source_data_df["source"] == "OSM"]
-            .sort_values("year", ascending=False)
-            .iloc[0]
-            .to_dict()
-        )
+    for preferred_source in source_priority:
+        if preferred_source in source_data_df["source"].unique():
+            return (
+                source_data_df[source_data_df["source"] == preferred_source]
+                .sort_values("year", ascending=False)
+                .iloc[0]
+                .to_dict()
+            )
 
     return source_data_df.sort_values("year", ascending=False).iloc[0].to_dict()
 
