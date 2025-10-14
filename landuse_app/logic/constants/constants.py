@@ -7,7 +7,7 @@ DEFAULT_RESIDENTIAL = {
 }
 
 # Dict of sources, appropriate for rquesting in Urban API
-VALID_SOURCES = {"PZZ", "OSM", "User"}
+VALID_SOURCES = {"PZZ", "OSM", "User", "Unknown Source"}
 
 # Physical objects needed for evaluation of functional zone effective usage
 actual_zone_mapping = {
@@ -102,5 +102,6 @@ ZONE_CLASS_BY_ID = {
     7: "Business",
     10: "Residential",
     11: "Residential",
+    12: "Residential",
     14: "Unknown",
 }

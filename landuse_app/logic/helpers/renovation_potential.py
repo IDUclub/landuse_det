@@ -39,8 +39,7 @@ def calculate_building_percentages(buildings_gdf: gpd.GeoDataFrame) -> pd.Series
         )
 
     residential_buildings = buildings_gdf.loc[
-        (buildings_gdf["object_type"] == "Жилой дом")
-        & buildings_gdf["storeys_count"].notna()
+        (buildings_gdf["object_type_id"] == 4) & buildings_gdf["storeys_count"].notna()
     ]
 
     categories = pd.cut(
@@ -96,13 +95,23 @@ def calculate_profiled_building_area(
 
 
 def calculate_total_building_area(buildings_in_zone, zone):
+    """
+    Compute share of any buildings in the zone.
+    Uses 'object_area' if present (e.g., with residential +3m buffer), otherwise geometry.area.
+    """
     geom = getattr(zone, "geometry", None)
     if geom is None or not isinstance(geom, (Polygon, MultiPolygon)) or geom.area == 0:
         return 0.0
+
     zone_area = geom.area
     if buildings_in_zone.empty:
         return 0.0
-    total_area = buildings_in_zone.geometry.area.sum()
+
+    if "object_area" in buildings_in_zone.columns:
+        total_area = buildings_in_zone["object_area"].sum()
+    else:
+        total_area = buildings_in_zone.geometry.area.sum()
+
     return (total_area / zone_area * 100.0) if zone_area > 0 else 0.0
 
 
@@ -142,13 +151,13 @@ async def assign_development_type(
         (landuse_polygons["landuse_zone"] == "Residential")
         & (landuse_polygons["Многоэтажная"] > 30.00),
         (landuse_polygons["landuse_zone"] == "Residential")
-        & (landuse_polygons["Среднеэтажная"] > 40.00),
+        & (landuse_polygons["Среднеэтажная"] > 30.00),
         (landuse_polygons["landuse_zone"] == "Special"),
         (landuse_polygons["Процент профильных объектов"].isna()),
         (landuse_polygons["Процент профильных объектов"] == 0.0),
         (landuse_polygons["Процент профильных объектов"] < 10.00),
-        (landuse_polygons["Процент профильных объектов"] < 15.00),
-        (landuse_polygons["Процент профильных объектов"] < 50.00),
+        (landuse_polygons["Процент профильных объектов"] < 20.00),
+        (landuse_polygons["Процент профильных объектов"] < 30.00),
         (landuse_polygons["Процент профильных объектов"] < 70.00),
         (landuse_polygons["Процент профильных объектов"] >= 90.00),
     ]
@@ -373,6 +382,16 @@ async def process_zones_with_bulk_update(
             zones = zones.drop(columns=drop_existing)
 
         phys["object_area"] = phys.geometry.area
+
+        mask_res = pd.Series(False, index=phys.index)
+        if "object_type_id" in phys.columns:
+            mask_res |= phys["object_type_id"] == 4
+        if "object_type" in phys.columns:
+            mask_res |= phys["object_type"].astype(str) == "Жилой дом"
+
+        if mask_res.any():
+            buffered_geom = phys.loc[mask_res, "geometry"].buffer(3.0)
+            phys.loc[mask_res, "object_area"] = buffered_geom.area
 
         joined = gpd.sjoin(
             phys, zones[["zone_id", "geometry"]], how="inner", predicate="intersects"
