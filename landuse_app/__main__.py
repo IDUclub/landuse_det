@@ -1,5 +1,6 @@
-from landuse_app import config
 import uvicorn
+
+from landuse_app import config
 
 
 def main():

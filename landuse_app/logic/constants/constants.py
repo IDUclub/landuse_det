@@ -1,48 +1,107 @@
 DEFAULT_RESIDENTIAL = {
-    "functional_zone_type": {
-        "id": 1,
-        "name": "residential",
-        "nickname": "Жилая зона"
-    },
+    "functional_zone_type": {"id": 1, "name": "residential", "nickname": "Жилая зона"},
     "zone_type_id": 1,
     "zone_type_name": "residential",
     "zone_type_nickname": "Жилая зона",
-    "landuse_zone": "Residential"
+    "landuse_zone": "Residential",
 }
 
-#Dict of sources, appropriate for rquesting in Urban API
-VALID_SOURCES = {"PZZ", "OSM", "User"}
+# Dict of sources, appropriate for rquesting in Urban API
+VALID_SOURCES = {"PZZ", "OSM", "User", "Unknown Source"}
 
-#Physical objects needed for evaluation of functional zone effective usage
+# Physical objects needed for evaluation of functional zone effective usage
 actual_zone_mapping = {
     "Residential": [
-        {"physical_object_type_id": 4.0,  "service_type_id": None, "physical_object_function_id": 1.0,  "urban_function_id": None}
+        {
+            "physical_object_type_id": 4.0,
+            "service_type_id": None,
+            "physical_object_function_id": 1.0,
+            "urban_function_id": None,
+        }
     ],
     "Industrial": [
-        {"physical_object_type_id": 43.0, "service_type_id": None, "physical_object_function_id": 16.0, "urban_function_id": None}
+        {
+            "physical_object_type_id": 43.0,
+            "service_type_id": None,
+            "physical_object_function_id": 16.0,
+            "urban_function_id": None,
+        }
     ],
     "Transport": [
-        {"physical_object_type_id": None, "service_type_id": 81.0, "physical_object_function_id": None,  "urban_function_id": 30.0},
-        {"physical_object_type_id": 61.0, "service_type_id": None, "physical_object_function_id": 21.0, "urban_function_id": None}
+        {
+            "physical_object_type_id": None,
+            "service_type_id": 81.0,
+            "physical_object_function_id": None,
+            "urban_function_id": 30.0,
+        },
+        {
+            "physical_object_type_id": 61.0,
+            "service_type_id": None,
+            "physical_object_function_id": 21.0,
+            "urban_function_id": None,
+        },
     ],
     "Business": [
-        {"physical_object_type_id": 5.0,  "service_type_id": None, "physical_object_function_id": 1.0,  "urban_function_id": None}
+        {
+            "physical_object_type_id": 5.0,
+            "service_type_id": None,
+            "physical_object_function_id": 1.0,
+            "urban_function_id": None,
+        }
     ],
     "Agriculture": [
-        {"physical_object_type_id": 60.0, "service_type_id": None, "physical_object_function_id": 17.0, "urban_function_id": None},
-        {"physical_object_type_id": 46.0, "service_type_id": None, "physical_object_function_id": 17.0, "urban_function_id": None}
+        {
+            "physical_object_type_id": 60.0,
+            "service_type_id": None,
+            "physical_object_function_id": 17.0,
+            "urban_function_id": None,
+        },
+        {
+            "physical_object_type_id": 46.0,
+            "service_type_id": None,
+            "physical_object_function_id": 17.0,
+            "urban_function_id": None,
+        },
     ],
     "Recreation": [
-        {"physical_object_type_id": 47.0,  "service_type_id": None, "physical_object_function_id": 2.0,  "urban_function_id": None},
-        {"physical_object_type_id": None,   "service_type_id": 4.0,  "physical_object_function_id": None,  "urban_function_id": 2.0},
-        {"physical_object_type_id": 3.0,   "service_type_id": None, "physical_object_function_id": 2.0,  "urban_function_id": None},
-        {"physical_object_type_id": None,   "service_type_id": 1.0,  "physical_object_function_id": None,  "urban_function_id": 2.0}
-    ]
+        {
+            "physical_object_type_id": 47.0,
+            "service_type_id": None,
+            "physical_object_function_id": 2.0,
+            "urban_function_id": None,
+        },
+        {
+            "physical_object_type_id": None,
+            "service_type_id": 4.0,
+            "physical_object_function_id": None,
+            "urban_function_id": 2.0,
+        },
+        {
+            "physical_object_type_id": 3.0,
+            "service_type_id": None,
+            "physical_object_function_id": 2.0,
+            "urban_function_id": None,
+        },
+        {
+            "physical_object_type_id": None,
+            "service_type_id": 1.0,
+            "physical_object_function_id": None,
+            "urban_function_id": 2.0,
+        },
+    ],
 }
 
-#Mapping of functional zones ids to their names
+# Mapping of functional zones ids to their names
 ZONE_CLASS_BY_ID = {
-            1: "Residential", 2: "Recreation", 3: "Special", 4: "Industrial",
-            5: "Agriculture", 6: "Transport", 7: "Business",
-            10: "Residential", 11: "Residential", 14: "Unknown"
-        }
+    1: "Residential",
+    2: "Recreation",
+    3: "Special",
+    4: "Industrial",
+    5: "Agriculture",
+    6: "Transport",
+    7: "Business",
+    10: "Residential",
+    11: "Residential",
+    12: "Residential",
+    14: "Unknown",
+}

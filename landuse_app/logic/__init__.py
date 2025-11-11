@@ -1,6 +1,6 @@
 """Logic module."""
 
-from .landuse import LanduseService, landuse_service
+from .landuse_service import LanduseService, landuse_service
 
 __all__ = [
     "LanduseService",

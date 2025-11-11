@@ -11,11 +11,12 @@ logger.add(
 )
 
 
-
 def bind_routes(application: FastAPI, prefix: str) -> None:
     """Bind all routes to application."""
     for route in list_of_routes:
-        application.include_router(route, prefix=(prefix if "/" not in {r.path for r in route.routes} else ""))
+        application.include_router(
+            route, prefix=(prefix if "/" not in {r.path for r in route.routes} else "")
+        )
 
 
 def get_app(prefix: str = "/api") -> FastAPI:
@@ -27,9 +28,12 @@ def get_app(prefix: str = "/api") -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url=f"{prefix}/openapi",
-        version=f"{config.get("VERSION")} ({config.get("LAST_UPDATE")})",
+        version=f"{config.get('VERSION')} ({config.get('LAST_UPDATE')})",
         terms_of_service="http://swagger.io/terms/",
-        license_info={"name": "Apache 2.0", "url": "http://www.apache.org/licenses/LICENSE-2.0.html"},
+        license_info={
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html",
+        },
     )
     bind_routes(application, prefix)
 

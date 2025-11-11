@@ -14,3 +14,6 @@ PyYAML~=6.0.2
 python-dotenv~=1.0.1
 pyproj~=3.7.0
 pyjwt~=2.10.1
+pre-commit~=4.2.0
+black~=25.1.0
+isort~=6.0.1

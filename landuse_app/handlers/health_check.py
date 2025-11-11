@@ -1,10 +1,10 @@
 """health_check handler is defined here."""
 
-from .routers import system_router
 from fastapi.responses import FileResponse
 
 from .. import config
 from ..exceptions.http_exception_wrapper import http_exception
+from .routers import system_router
 
 
 @system_router.get(
@@ -17,6 +17,7 @@ async def health_check():
     """
     return {"status": "ok"}
 
+
 @system_router.get("/logs")
 async def get_logs():
     """
@@ -26,7 +27,7 @@ async def get_logs():
     try:
         return FileResponse(
             f"{config.get('LOG_FILE')}.log",
-            media_type='application/octet-stream',
+            media_type="application/octet-stream",
             filename=f"{config.get('LOG_FILE')}.log",
         )
     except FileNotFoundError as e:
