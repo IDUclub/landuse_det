@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 class Cacheable(ABC):

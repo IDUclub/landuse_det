@@ -19,13 +19,13 @@ async def get_projects_territory(project_id: int) -> dict:
     dict: Territory information.
     """
     endpoint = f"/api/v1/projects/{project_id}/territory"
-    headers = {
-        "Authorization": f"Bearer {config.get('ACCESS_TOKEN')}"""
-    }
+    headers = {"Authorization": f"Bearer {config.get('ACCESS_TOKEN')}" ""}
     response = await urban_db_api.get(endpoint)
 
     if not response:
-        raise http_exception(404, f"No territory information found for project ID:", project_id)
+        raise http_exception(
+            404, f"No territory information found for project ID:", project_id
+        )
 
     return response
 
@@ -49,9 +49,7 @@ async def get_projects_base_scenario_id(project_id: int) -> int:
 
 
 async def get_functional_zone_sources(
-    scenario_id: int,
-    source: str | None = None,
-    year: int | None = None
+    scenario_id: int, source: str = None, year: int = None, is_context: bool = False
 ) -> dict:
     """
     Fetch available functional zone sources for a given scenario ID and determine the best source.
@@ -66,11 +64,19 @@ async def get_functional_zone_sources(
     Raises:
     http_exception: If no sources are found or the specified source is not available.
     """
-    endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zone_sources"
+    if is_context:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/context/functional_zone_sources"
+    else:
+        endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zone_sources"
+
     response = await urban_db_api.get(endpoint)
 
     if not response:
-        raise http_exception(404, f"Data not found for scenario", scenario_id)
+        raise http_exception(
+            404,
+            f"No functional zone sources found for the given scenario ID",
+            scenario_id,
+        )
 
     filtered_sources = _filter_sources(response, source, year)
 
@@ -78,12 +84,18 @@ async def get_functional_zone_sources(
         return await _form_source_params(filtered_sources)
 
     if source or year:
-        raise http_exception(404, f"Data not found for scenario {scenario_id}", {"source": source, "year": year})
+        raise http_exception(
+            404,
+            f"No data found for the specified source or year",
+            {"source": source, "year": year},
+        )
 
     return await _form_source_params(response)
 
 
-def _filter_sources(sources: list[dict], source: str | None, year: int | None) -> list[dict]:
+def _filter_sources(
+    sources: list[dict], source: str | None, year: int | None
+) -> list[dict]:
     filtered = sources
 
     if source:
@@ -96,14 +108,23 @@ def _filter_sources(sources: list[dict], source: str | None, year: int | None) -
 
 
 async def _form_source_params(sources: list[dict]) -> dict:
+    """
+    Determine the most relevant functional zone source from the available sources.
+
+    Parameters:
+    sources (list[dict]): List of available sources.
+
+    Returns:
+    dict: The most relevant source dictionary containing 'source' and 'year'.
+    """
     if not sources:
-        raise http_exception(404, "No sources are available to choose from")
+        raise http_exception(404, "Нет доступных источников для выбора")
 
     if len(sources) == 1:
         return sources[0]
 
     source_data_df = pd.DataFrame(sources)
-    source_priority = ["Unknown Source", "User", "PZZ", "OSM"]
+    source_priority = ["User", "PZZ", "OSM", "Unknown Source"]
 
     for preferred_source in source_priority:
         if preferred_source in source_data_df["source"].unique():
@@ -117,7 +138,9 @@ async def _form_source_params(sources: list[dict]) -> dict:
     return source_data_df.sort_values("year", ascending=False).iloc[0].to_dict()
 
 
-async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = False, source: str = None) -> dict:
+async def get_functional_zones_scenario_id(
+    scenario_id: int, is_context: bool = False, source: str = None, year: int = None
+) -> dict:
     """
     Fetches functional zones for a project with an optional context flag and source selection.
 
@@ -133,10 +156,14 @@ async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = 
     http_exception: If the response is empty or the specified source is not available.
     """
     # base_scenario_id = await get_projects_base_scenario_id(scenario_id)
-    source_data = await get_functional_zone_sources(scenario_id, source)
+    source_data = await get_functional_zone_sources(
+        scenario_id, source, year, is_context
+    )
 
     if not source_data or "source" not in source_data or "year" not in source_data:
-        raise http_exception(404, "No valid source found for the given project ID", scenario_id)
+        raise http_exception(
+            404, "No valid source found for the given project ID", scenario_id
+        )
 
     source = source_data["source"]
     year = source_data["year"]
@@ -148,12 +175,16 @@ async def get_functional_zones_scenario_id(scenario_id: int, is_context: bool = 
 
     response = await urban_db_api.get(endpoint)
     if not response or "features" not in response or not response["features"]:
-        raise http_exception(404, "No functional zones found for the given project ID", scenario_id)
+        raise http_exception(
+            404, "No functional zones found for the given project ID", scenario_id
+        )
 
     return response
 
 
-async def get_all_physical_objects_geometries(scenario_id: int, is_context: bool = False) -> dict:
+async def get_all_physical_objects_geometries(
+    scenario_id: int, is_context: bool = False
+) -> dict:
     """
     Fetches all physical object geometries for a project, optionally for context.
 
@@ -178,18 +209,24 @@ async def get_all_physical_objects_geometries(scenario_id: int, is_context: bool
     try:
         response = await urban_db_api.get(endpoint)
     except Exception as e:
-        raise http_exception(404, "No geometries found for the given scenario ID:", str(e))
+        raise http_exception(
+            404, "No geometries found for the given scenario ID:", str(e)
+        )
 
     return response
 
 
-async def get_all_physical_objects_geometries_type_id(scenario_id: int, object_type_id: int) -> dict:
+async def get_all_physical_objects_geometries_type_id(
+    scenario_id: int, object_type_id: int
+) -> dict:
     return await urban_db_api.get(
         f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects?physical_object_type_id={object_type_id}"
     )
 
 
-async def get_functional_zones_scen_id_percentages(scenario_id: int, source: str = None) -> dict:
+async def get_functional_zones_scen_id_percentages(
+    scenario_id: int, source: str = None
+) -> dict:
     """
     Fetches functional zone percentages for a given scenario ID with an optional source selection.
 
@@ -206,21 +243,29 @@ async def get_functional_zones_scen_id_percentages(scenario_id: int, source: str
     source_data = await get_functional_zone_sources(scenario_id, source)
 
     if not source_data or "source" not in source_data or "year" not in source_data:
-        raise http_exception(404, "No valid source found for the given scenario ID", scenario_id)
+        raise http_exception(
+            404, "No valid source found for the given scenario ID", scenario_id
+        )
 
     source = source_data["source"]
     year = source_data["year"]
 
-    endpoint = f"/api/v1/scenarios/{scenario_id}/functional_zones?year={year}&source={source}"
+    endpoint = (
+        f"/api/v1/scenarios/{scenario_id}/functional_zones?year={year}&source={source}"
+    )
     response = await urban_db_api.get(endpoint)
 
     if not response or "features" not in response or not response["features"]:
-        raise http_exception(404, "No functional zones found for the given scenario ID", scenario_id)
+        raise http_exception(
+            404, "No functional zones found for the given scenario ID", scenario_id
+        )
 
     return response
 
 
-async def get_all_physical_objects_geometries_scen_id_percentages(scenario_id: int) -> dict:
+async def get_all_physical_objects_geometries_scen_id_percentages(
+    scenario_id: int,
+) -> dict:
     """
     Fetches all physical object geometries for a project, optionally for context.
 
@@ -236,30 +281,38 @@ async def get_all_physical_objects_geometries_scen_id_percentages(scenario_id: i
     response = await urban_db_api.get(endpoint)
 
     if not response or "features" not in response or not response["features"]:
-        raise http_exception(404, "No functional zones found for the given scenario ID:", scenario_id)
+        raise http_exception(
+            404, "No functional zones found for the given scenario ID:", scenario_id
+        )
 
     return response
 
 
-async def get_functional_zone_sources_territory_id(territory_id: int, source: str = None) -> dict:
+async def get_functional_zone_sources_territory_id(
+    territory_id: int, source: str = None
+) -> dict:
     """
-        Fetch available functional zone sources for a given scenario ID and determine the best source.
+    Fetch available functional zone sources for a given scenario ID and determine the best source.
 
-        Parameters:
-        scenario_id (int): The ID of the scenario.
-        source (str, optional): The preferred source (PZZ or OSM). If not provided, the best source is selected automatically.
+    Parameters:
+    scenario_id (int): The ID of the scenario.
+    source (str, optional): The preferred source (PZZ or OSM). If not provided, the best source is selected automatically.
 
-        Returns:
-        dict: The most relevant functional zone source data.
+    Returns:
+    dict: The most relevant functional zone source data.
 
-        Raises:
-        http_exception: If no sources are found or the specified source is not available.
-        """
+    Raises:
+    http_exception: If no sources are found or the specified source is not available.
+    """
     endpoint = f"/api/v1/territory/{territory_id}/functional_zone_sources"
     response = await urban_db_api.get(endpoint)
 
     if not response:
-        raise http_exception(404, f"No functional zone sources found for the given territory id ID", territory_id)
+        raise http_exception(
+            404,
+            f"No functional zone sources found for the given territory id ID",
+            territory_id,
+        )
 
     if source:
         source_data = next((s for s in response if s["source"] == source), None)
@@ -270,60 +323,67 @@ async def get_functional_zone_sources_territory_id(territory_id: int, source: st
     return await _form_source_params(response)
 
 
-async def get_functional_zones_territory_id(territory_id: int, source: str = None, functional_zone_type_id: int = None,
-                                            params: dict = None) -> dict:
+async def get_functional_zones_territory_id(
+    territory_id: int,
+    source: str = None,
+    functional_zone_type_id: int = None,
+    params: dict = None,
+) -> dict:
     """
-        Fetches functional zones for a project with an optional context flag and source selection.
+    Fetches functional zones for a project with an optional context flag and source selection.
 
-        Parameters:
-        project_id (int): ID of the project.
-        is_context (bool): Flag to determine if context data should be fetched. Default is False.
-        source (str, optional): The preferred source (PZZ or OSM). If not provided, the best source is selected automatically.
+    Parameters:
+    project_id (int): ID of the project.
+    is_context (bool): Flag to determine if context data should be fetched. Default is False.
+    source (str, optional): The preferred source (PZZ or OSM). If not provided, the best source is selected automatically.
 
-        Returns:
-        dict: Response data from the API.
+    Returns:
+    dict: Response data from the API.
 
-        Raises:
-        http_exception: If the response is empty or the specified source is not available.
-        """
+    Raises:
+    http_exception: If the response is empty or the specified source is not available.
+    """
     source_data = await get_functional_zone_sources_territory_id(territory_id, source)
 
     if not source_data or "source" not in source_data or "year" not in source_data:
-        raise http_exception(404, "No valid source found for the given project ID", territory_id)
+        raise http_exception(
+            404, "No valid source found for the given project ID", territory_id
+        )
 
     source = source_data["source"]
     year = source_data["year"]
 
     if functional_zone_type_id:
-        endpoint = (
-            f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}&functional_zone_type_id={functional_zone_type_id}"
-        )
+        endpoint = f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}&functional_zone_type_id={functional_zone_type_id}"
     else:
-        endpoint = (
-            f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}"
-        )
+        endpoint = f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}"
 
     response = await urban_db_api.get(endpoint, params=params)
     if not response:
-        raise http_exception(404, "No functional zones found for the given project ID", territory_id)
+        raise http_exception(
+            404, "No functional zones found for the given project ID", territory_id
+        )
 
     return response
 
 
-async def get_functional_zones_geojson_territory_id(territory_id: int, source: str = None,
-                                                    functional_zone_type_id: int = None, params: dict = None) -> dict:
+async def get_functional_zones_geojson_territory_id(
+    territory_id: int,
+    source: str = None,
+    functional_zone_type_id: int = None,
+    params: dict = None,
+) -> dict:
     source_data = await get_functional_zone_sources_territory_id(territory_id, source)
     if not source_data or "source" not in source_data or "year" not in source_data:
-        raise http_exception(404, "No valid source found for the given project ID", territory_id)
+        raise http_exception(
+            404, "No valid source found for the given project ID", territory_id
+        )
     source = source_data["source"]
     year = source_data["year"]
     if functional_zone_type_id:
-        endpoint = (
-            f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}&functional_zone_type_id={functional_zone_type_id}"
-        )
+        endpoint = f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}&functional_zone_type_id={functional_zone_type_id}"
     else:
-        endpoint = (f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}"
-                    )
+        endpoint = f"/api/v1/territory/{territory_id}/functional_zones?year={year}&source={source}"
 
     response = await urban_db_api.get(endpoint, params=params)
     return response
@@ -349,21 +409,21 @@ async def get_physical_objects_from_territory(territory_id: int) -> dict:
         http_exception: If the response is empty.
     """
 
-    endpoint = (
-        f"/api/v1/territory/{territory_id}/physical_objects_geojson"
-    )
+    endpoint = f"/api/v1/territory/{territory_id}/physical_objects_geojson"
 
     response = await urban_db_api.get(endpoint)
     if not response or "features" not in response or not response["features"]:
-        raise http_exception(404, "No physical objects found for the given territory ID:", territory_id)
+        raise http_exception(
+            404, "No physical objects found for the given territory ID:", territory_id
+        )
 
     return response
 
 
-async def get_physical_objects_without_geometry(territory_id: int, params: dict = None) -> dict:
-    endpoint = (
-        f"/api/v1/territory/{territory_id}/physical_objects"
-    )
+async def get_physical_objects_without_geometry(
+    territory_id: int, params: dict = None
+) -> dict:
+    endpoint = f"/api/v1/territory/{territory_id}/physical_objects"
     response = await urban_db_api.get(endpoint, params=params)
     return response
 
@@ -413,7 +473,9 @@ async def check_indicator_exists(territory_id: int, indicator_id: int) -> dict |
     return data
 
 
-async def get_indicator_values(territory_id: int, indicator_id: int, params: dict = None) -> dict | None:
+async def get_indicator_values(
+    territory_id: int, indicator_id: int, params: dict = None
+) -> dict | None:
     endpoint = (
         f"/api/v1/territory/{territory_id}/indicator_values"
         f"?indicator_ids={indicator_id}"
@@ -450,8 +512,9 @@ async def put_indicator_value(indicator_data: dict) -> dict:
     return await urban_db_api.put(endpoint, data=indicator_data)
 
 
-async def get_physical_objects_from_territory_parallel(territory_id: int,
-                                                       page_size: int = int(config.get("PAGE_SIZE"))) -> list[dict]:
+async def get_physical_objects_from_territory_parallel(
+    territory_id: int, page_size: int = int(config.get("PAGE_SIZE"))
+) -> list[dict]:
     """
     Fetch physical objects from a territory in parallel with a concurrency limit of 5.
 
@@ -471,7 +534,9 @@ async def get_physical_objects_from_territory_parallel(territory_id: int,
     initial_response = await urban_db_api.get(endpoint)
     total = initial_response.get("count", 0)
     total_pages = (total // page_size) + (1 if total % page_size else 0)
-    logger.info(f"Total physical objects on territory: {total}, Total number of pages: {total_pages}")
+    logger.info(
+        f"Total physical objects on territory: {total}, Total number of pages: {total_pages}"
+    )
 
     urls = [
         f"/api/v1/territory/{territory_id}/physical_objects_with_geometry?page={i}&page_size={page_size}"
@@ -499,7 +564,9 @@ async def get_territory_boundaries(territory_id: int) -> dict:
     endpoint = f"/api/v1/territory/{territory_id}"
     response = await urban_db_api.get(endpoint)
     if not response:
-        raise http_exception(404, "No boundaries found for given territory ID:", territory_id)
+        raise http_exception(
+            404, "No boundaries found for given territory ID:", territory_id
+        )
     return response
 
 
@@ -510,32 +577,39 @@ async def get_service_type_id_through_indicator(indicator_id: int) -> int:
     if isinstance(service_type_id, dict):
         service_type_id = service_type_id.get("id", 0)
     if not service_type_id:
-        raise http_exception(404, "No assigned service found for given indicator ID:", indicator_id)
+        raise http_exception(
+            404, "No assigned service found for given indicator ID:", indicator_id
+        )
     return service_type_id
 
 
 async def get_service_count(territory_id: int, service_type_id: int) -> int:
     endpoint = f"/api/v1/territory/{territory_id}/services"
-    params = {
-        "service_type_id": service_type_id,
-        "page_size": 10
-    }
+    params = {"service_type_id": service_type_id, "page_size": 10}
     response = await urban_db_api.get(endpoint, params=params)
     if not response:
-        raise http_exception(404, "No services found for given territory ID:", territory_id)
+        raise http_exception(
+            404, "No services found for given territory ID:", territory_id
+        )
     number_of_services = response.get("count", 0)
     return number_of_services
 
 
-async def get_services_geojson(territory_id: int, service_type_id: int, params: dict = None) -> dict:
+async def get_services_geojson(
+    territory_id: int, service_type_id: int, params: dict = None
+) -> dict:
     endpoint = f"/api/v1/territory/{territory_id}/services_geojson?service_type_id={service_type_id}"
     response = await urban_db_api.get(endpoint, params=params)
     if not response:
-        raise http_exception(404, "No services found for given territory ID:", territory_id)
+        raise http_exception(
+            404, "No services found for given territory ID:", territory_id
+        )
     return response
 
 
-async def check_project_indicator_exist(project_id: int, indicator_id: int) -> dict | None:
+async def check_project_indicator_exist(
+    project_id: int, indicator_id: int
+) -> dict | None:
     """
     Attempts to retrieve an existing indicator from the database.
 
@@ -555,12 +629,12 @@ async def check_project_indicator_exist(project_id: int, indicator_id: int) -> d
 
 
 async def put_project_indicator(
-        scenario_id: int,
-        indicator_data: dict,
-        *,
-        use_token: bool = True,
-        override_token: str | None = None,
-        extra_headers: dict[str, str] | None = None
+    scenario_id: int,
+    indicator_data: dict,
+    *,
+    use_token: bool = True,
+    override_token: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict:
     endpoint = f"/api/v1/scenarios/{scenario_id}/indicators_values"
     return await urban_db_api.put(
@@ -568,5 +642,5 @@ async def put_project_indicator(
         data=indicator_data,
         use_token=use_token,
         override_token=override_token,
-        extra_headers=extra_headers
+        extra_headers=extra_headers,
     )

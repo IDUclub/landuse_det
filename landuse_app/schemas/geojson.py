@@ -20,7 +20,9 @@ class GeoJSON(FeatureCollection):
         for feature in features:
             properties = dict(feature)
             geometry = properties.pop("geometry", None)
-            feature_collection.append(Feature(type="Feature", geometry=geometry, properties=properties))
+            feature_collection.append(
+                Feature(type="Feature", geometry=geometry, properties=properties)
+            )
         return cls(features=feature_collection)
 
     @classmethod
@@ -29,5 +31,7 @@ class GeoJSON(FeatureCollection):
         for _, row in gdf.iterrows():
             geometry = mapping(row.geometry)
             properties = row.drop("geometry").to_dict()
-            feature_collection.append(Feature(type="Feature", geometry=geometry, properties=properties))
+            feature_collection.append(
+                Feature(type="Feature", geometry=geometry, properties=properties)
+            )
         return cls(features=feature_collection)

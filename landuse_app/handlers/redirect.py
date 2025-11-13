@@ -2,7 +2,6 @@
 
 import fastapi
 
-
 from .routers import system_router
 
 
