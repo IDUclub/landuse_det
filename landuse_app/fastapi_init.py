@@ -1,9 +1,12 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from loguru import logger
 
 from landuse_app import config
+from landuse_app.dependencies import consumer
 from landuse_app.handlers import list_of_routes
 
 logger.add(
@@ -19,6 +22,12 @@ def bind_routes(application: FastAPI, prefix: str) -> None:
         )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await consumer.start(["scenario.events"])
+    yield
+
+
 def get_app(prefix: str = "/api") -> FastAPI:
     """Create application and all dependable objects."""
 
@@ -27,6 +36,7 @@ def get_app(prefix: str = "/api") -> FastAPI:
         description=config.get("API_DESCRIPTION"),
         docs_url=None,
         redoc_url=None,
+        lifespan=lifespan,
         openapi_url=f"{prefix}/openapi",
         version=f"{config.get('VERSION')} ({config.get('LAST_UPDATE')})",
         terms_of_service="http://swagger.io/terms/",
