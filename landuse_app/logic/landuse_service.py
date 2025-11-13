@@ -52,6 +52,6 @@ class LanduseService:
     ) -> dict:
         """Calculates and saves the urbanization percentage for a given territory in Urban DB"""
         return await get_territory(territory_id, source, force_recalculate)
-
-
-landuse_service = LanduseService()
+#
+#
+# landuse_service = LanduseService()
