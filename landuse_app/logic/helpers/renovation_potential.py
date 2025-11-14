@@ -10,20 +10,22 @@ from pandarallel import pandarallel
 from shapely import MultiPolygon, Polygon
 
 from landuse_app.schemas import GeoJSON, Profile
-from storage.caching import CachingService
+from ...dependencies import caching_service, interpretation_service, urban_api, preprocessing_service
+# from storage.caching import CachingService
 
 from ...exceptions.http_exception_wrapper import http_exception
 from ..constants.constants import actual_zone_mapping
-from .interpretation_service import interpretation_service
-from .preprocessing_service import data_extraction
 from .spatial_methods import SpatialMethods
-from .urban_api_access import get_functional_zone_sources
+
 
 pandarallel.initialize(progress_bar=False, nb_workers=4)
 
 class RenovationPotential:
-    def __init__(self, caching_service: CachingService):
-        self.caching_service = caching_service
+    def __init__(self, caching: caching_service, interpretation: interpretation_service, urban_api_access: urban_api, preprocessing: preprocessing_service):
+        self.caching = caching
+        self.interpretation = interpretation
+        self.preprocessing = preprocessing
+        self.urban_api_access = urban_api_access
 
     def calculate_building_percentages(self, buildings_gdf: gpd.GeoDataFrame) -> pd.Series:
         """
@@ -492,7 +494,7 @@ class RenovationPotential:
         profile_key = str(profile) if profile is not None else "no_profile"
 
         if source is None:
-            source_data = await get_functional_zone_sources(
+            source_data = await self.urban_api_access.get_functional_zone_sources(
                 scenario_id, is_context=is_context
             )
             source_key = source_data["source"]
@@ -502,18 +504,18 @@ class RenovationPotential:
             year_key = year
 
         cache_name = f"renovation_potential_project-{scenario_id}_is_context-{is_context}"
-        cache_file = self.caching_service.get_recent_cache_file(
+        cache_file = self.caching.get_recent_cache_file(
             cache_name, {"profile": profile_key, "source": source_key, "year": year_key}
         )
 
-        if cache_file and self.caching_service.is_cache_valid(cache_file):
+        if cache_file and self.caching.is_cache_valid(cache_file):
             logger.info(f"Using cached renovation potential for scenario {scenario_id}")
-            cached_data = self.caching_service.load_cache(cache_file)
+            cached_data = self.caching.load_cache(cache_file)
             return gpd.GeoDataFrame.from_features(cached_data, crs="EPSG:4326")
 
         physical_objects_dict, landuse_polygons = await asyncio.gather(
-            data_extraction.extract_physical_objects(scenario_id, is_context),
-            data_extraction.extract_landuse(scenario_id, is_context, source, year),
+            self.preprocessing.extract_physical_objects(scenario_id, is_context),
+            self.preprocessing.extract_landuse(scenario_id, is_context, source, year),
         )
         physical_objects = physical_objects_dict["physical_objects"]
         utm_crs = physical_objects.estimate_utm_crs()
@@ -573,7 +575,7 @@ class RenovationPotential:
             landuse_polygons_ren_pot = zones.to_crs(epsg=4326)
 
             result_json = json.loads(landuse_polygons_ren_pot.to_json())
-            self.caching_service.save_with_cleanup(
+            self.caching.save_with_cleanup(
                 result_json,
                 cache_name,
                 {"profile": profile_key, "source": source_key, "year": year_key},
@@ -612,7 +614,7 @@ class RenovationPotential:
         landuse_polygons_ren_pot = zones.to_crs(epsg=4326)
 
         result_json = json.loads(landuse_polygons_ren_pot.to_json())
-        self.caching_service.save_with_cleanup(
+        self.caching.save_with_cleanup(
             result_json,
             cache_name,
             {"profile": profile_key, "source": source_key, "year": year_key},
@@ -694,8 +696,8 @@ class RenovationPotential:
             dict: A dictionary with the percentages for each unique landuse zone.
         """
         physical_objects_dict, landuse_polygons = await asyncio.gather(
-            data_extraction.extract_physical_objects(scenario_id, is_context),
-            data_extraction.extract_landuse(scenario_id, is_context, source, year),
+            self.interpretation.extract_physical_objects(scenario_id, is_context),
+            self.interpretation.extract_landuse(scenario_id, is_context, source, year),
         )
 
         water_objects = physical_objects_dict["water_objects"]

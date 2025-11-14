@@ -7,33 +7,22 @@ import geopandas as gpd
 from loguru import logger
 from shapely.geometry import shape
 
+from landuse_app.dependencies import urban_api, spatial_methods
 from landuse_app.exceptions.http_exception_wrapper import http_exception
-from landuse_app.logic.helpers.spatial_methods import SpatialMethods
-from landuse_app.logic.helpers.urban_api_access import (
-    check_indicator_exists,
-    check_project_indicator_exist,
-    get_functional_zones_geojson_territory_id,
-    get_indicator_values,
-    get_physical_objects_without_geometry,
-    get_projects_territory,
-    get_service_count,
-    get_service_type_id_through_indicator,
-    get_services_geojson,
-    get_target_cities,
-    get_territory_boundaries,
-    put_indicator_value,
-    put_project_indicator,
-)
 
 
 class IndicatorsService:
-    @staticmethod
+    def __init__(self, urban_db_api: urban_api, spatial_methods: spatial_methods):
+        self.urban_db_api = urban_db_api
+        self.spatial = spatial_methods
+
+
     async def calculate_territory_area(
-        territory_id: int, force_recalculate: bool = False
+        self, territory_id: int, force_recalculate: bool = False
     ) -> dict:
         indicator_id = 4
         if not force_recalculate:
-            existing_indicator = await check_indicator_exists(
+            existing_indicator = await self.urban_db_api.check_indicator_exists(
                 territory_id, indicator_id
             )
             if existing_indicator is not None:
@@ -41,7 +30,7 @@ class IndicatorsService:
                     f"Indicator already exists in Urban DB, returning existing value"
                 )
                 return existing_indicator
-        territory_data = await get_territory_boundaries(territory_id)
+        territory_data = await self.urban_db_api.get_territory_boundaries(territory_id)
         geometry = shape(territory_data["geometry"])
         gdf = gpd.gpd.GeoDataFrame(
             [
@@ -65,15 +54,14 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        computed_indicator = await put_indicator_value(payload)
+        computed_indicator = await self.urban_db_api.put_indicator_value(payload)
         return computed_indicator
 
-    @staticmethod
     async def calculate_service_count(
-        territory_id: int, indicator_id: int, force_recalculate: bool = False
+        self, territory_id: int, indicator_id: int, force_recalculate: bool = False
     ) -> dict:
         if not force_recalculate:
-            existing_indicator = await check_indicator_exists(
+            existing_indicator = await self.urban_db_api.check_indicator_exists(
                 territory_id, indicator_id
             )
             if existing_indicator is not None:
@@ -81,8 +69,8 @@ class IndicatorsService:
                     f"Indicator already exists in Urban DB, returning existing value"
                 )
                 return existing_indicator
-        service_id = await get_service_type_id_through_indicator(indicator_id)
-        services_count = await get_service_count(territory_id, service_id)
+        service_id = await self.urban_db_api.get_service_type_id_through_indicator(indicator_id)
+        services_count = await self.urban_db_api.get_service_count(territory_id, service_id)
         payload = {
             "indicator_id": indicator_id,
             "territory_id": territory_id,
@@ -93,16 +81,16 @@ class IndicatorsService:
             "information_source": "modeled",
         }
 
-        computed_indicator = await put_indicator_value(payload)
+        computed_indicator = await self.urban_db_api.put_indicator_value(payload)
         return computed_indicator
 
-    @staticmethod
+
     async def calculate_project_territory_area(
-        project_id: int, force_recalculate: bool = False
+        self, project_id: int, force_recalculate: bool = False
     ) -> dict:
         logger.info(f"Started calculation for project id {project_id}")
         if not force_recalculate:
-            existing_indicator = await check_project_indicator_exist(
+            existing_indicator = await self.urban_db_api.check_project_indicator_exist(
                 project_id, indicator_id=4
             )
             if existing_indicator is not None:
@@ -110,11 +98,11 @@ class IndicatorsService:
                     f"Indicator already exists in Urban DB, returning existing value"
                 )
                 return existing_indicator
-        territory_data = await get_projects_territory(project_id)
-        territory_gdf = await SpatialMethods.to_project_gdf(territory_data)
+        territory_data = await self.urban_db_api.get_projects_territory(project_id)
+        territory_gdf = await self.spatial.to_project_gdf(territory_data)
 
         geom = territory_gdf.geometry.iloc[0]
-        area_km2 = await SpatialMethods.compute_area(geom)
+        area_km2 = await self.spatial.compute_area(geom)
         area_km2 = round(area_km2, 2)
 
         scenario_id = territory_gdf["scenario_id"].loc[0]
@@ -132,28 +120,27 @@ class IndicatorsService:
         }
         logger.info(f"Calculation for project id {project_id} successful")
 
-        computed_indicator = await put_project_indicator(scenario_id, payload)
+        computed_indicator = await self.urban_db_api.put_project_indicator(scenario_id, payload)
 
         return computed_indicator
 
-    @staticmethod
     async def population_density(
-        territory_id: int, force_recalculate: bool = False
+        self, territory_id: int, force_recalculate: bool = False
     ) -> dict:
         logger.info(f"Started density calculation for territory {territory_id}")
 
         if not force_recalculate:
-            existing = await check_indicator_exists(territory_id, indicator_id=37)
+            existing = await self.urban_db_api.check_indicator_exists(territory_id, indicator_id=37)
             if existing is not None:
                 logger.info("Existing density indicator found, returning it")
                 return existing
 
-        territory_data = await get_territory_boundaries(territory_id)
-        territory_gdf = await SpatialMethods.to_project_gdf(territory_data)
+        territory_data = await self.urban_db_api.get_territory_boundaries(territory_id)
+        territory_gdf = await self.spatial.to_project_gdf(territory_data)
         gdf_utm = territory_gdf.to_crs(territory_gdf.estimate_utm_crs())
         area_km2 = gdf_utm.area.sum() / 1e6
 
-        population_data = await get_indicator_values(territory_id, indicator_id=1)
+        population_data = await self.urban_db_api.get_indicator_values(territory_id, indicator_id=1)
         if not population_data:
             http_exception(404, f"No population data for territory {territory_id}")
 
@@ -183,23 +170,23 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        computed = await put_indicator_value(payload)
+        computed = await self.urban_db_api.put_indicator_value(payload)
         logger.info(
             f"Stored density for territory {territory_id}: {density} population/km²"
         )
 
         return computed
 
-    @staticmethod
-    async def target_cities(territory_id: int, force_recalculate: bool = False) -> dict:
+
+    async def target_cities(self, territory_id: int, force_recalculate: bool = False) -> dict:
         if not force_recalculate:
-            existing = await check_indicator_exists(territory_id, indicator_id=349)
+            existing = await self.urban_db_api.check_indicator_exists(territory_id, indicator_id=349)
             if existing is not None:
                 logger.info("Existing density indicator found, returning it")
                 return existing
 
         logger.info(f"Started calculation for territory {territory_id}")
-        cities_response = await get_target_cities(territory_id)
+        cities_response = await self.urban_db_api.get_target_cities(territory_id)
         count = sum(
             1 for item in cities_response if item.get("target_city_type") is not None
         )
@@ -212,13 +199,13 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        computed = await put_indicator_value(payload)
+        computed = await self.urban_db_api.put_indicator_value(payload)
         logger.info(f"Stored target cities count for territory {territory_id}: {count}")
         return computed
 
-    @staticmethod
+
     async def city_size_indicator(
-        territory_id: int, indicator_id: int, force_recalculate: bool = False
+        self, territory_id: int, indicator_id: int, force_recalculate: bool = False
     ) -> dict:
         """
         Count cities on a territory by population size category and store the result.
@@ -236,7 +223,7 @@ class IndicatorsService:
         finally writes the count back under the given `indicator_id`.
         """
         if not force_recalculate:
-            existing = await check_indicator_exists(
+            existing = await self.urban_db_api.check_indicator_exists(
                 territory_id, indicator_id=indicator_id
             )
             if existing is not None:
@@ -250,7 +237,7 @@ class IndicatorsService:
             "include_child_territories": "true",
             "last_only": "true",
         }
-        pop_values = await get_indicator_values(
+        pop_values = await self.urban_db_api.get_indicator_values(
             territory_id, indicator_id=1, params=params
         )
         values = [item.get("value", 0) for item in (pop_values or [])]
@@ -284,18 +271,18 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        result = await put_indicator_value(payload)
+        result = await self.urban_db_api.put_indicator_value(payload)
         logger.info(
             f"Stored {count} cities for territory={territory_id}, indicator={indicator_id}"
         )
         return result
 
-    @staticmethod
+
     async def engineering_infrastructure(
-        territory_id: int, force_recalculate: bool = False
+        self, territory_id: int, force_recalculate: bool = False
     ) -> dict:
         if not force_recalculate:
-            existing = await check_indicator_exists(territory_id, indicator_id=88)
+            existing = await self.urban_db_api.check_indicator_exists(territory_id, indicator_id=88)
             if existing is not None:
                 logger.info("Existing density indicator found, returning it")
                 return existing
@@ -304,7 +291,7 @@ class IndicatorsService:
             "page_size": "1",
         }
         engineering_infrastructure_response = (
-            await get_physical_objects_without_geometry(territory_id, params=params)
+            await self.urban_db_api.get_physical_objects_without_geometry(territory_id, params=params)
         )
         number_of_objects = engineering_infrastructure_response.get("count", 0)
         payload = {
@@ -316,20 +303,20 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        computed = await put_indicator_value(payload)
+        computed = await self.urban_db_api.put_indicator_value(payload)
         return computed
 
-    @staticmethod
+
     async def recreation_area(
-        territory_id: int, force_recalculate: bool = False, source: str = None
+        self, territory_id: int, force_recalculate: bool = False, source: str = None
     ) -> dict:
         if not force_recalculate:
-            existing = await check_indicator_exists(territory_id, indicator_id=138)
+            existing = await self.urban_db_api.check_indicator_exists(territory_id, indicator_id=138)
             if existing is not None:
                 logger.info("Existing density indicator found, returning it")
                 return existing
 
-        recreation_data = await get_functional_zones_geojson_territory_id(
+        recreation_data = await self.urban_db_api.get_functional_zones_geojson_territory_id(
             territory_id, source, functional_zone_type_id=2
         )
         recreation_gdf = gpd.GeoDataFrame.from_features(recreation_data)
@@ -346,22 +333,22 @@ class IndicatorsService:
             "value_type": "real",
             "information_source": "modeled",
         }
-        computed = await put_indicator_value(payload)
+        computed = await self.urban_db_api.put_indicator_value(payload)
         return computed
 
-    @staticmethod
-    async def oopt_parts(territory_id: int, force_recalculate: bool = False):
+
+    async def oopt_parts(self, territory_id: int, force_recalculate: bool = False):
         if not force_recalculate:
-            existing = await check_indicator_exists(territory_id, indicator_id=187)
+            existing = await self.urban_db_api.check_indicator_exists(territory_id, indicator_id=187)
             if existing is not None:
                 logger.info("Existing density indicator found, returning it")
                 return existing
-        territory_data = await get_territory_boundaries(territory_id)
-        territory_gdf = await SpatialMethods.to_project_gdf(territory_data)
+        territory_data = await self.urban_db_api.get_territory_boundaries(territory_id)
+        territory_gdf = await self.spatial.to_project_gdf(territory_data)
         gdf_utm = territory_gdf.to_crs(territory_gdf.estimate_utm_crs())
         area_km2 = gdf_utm.area.sum() / 1e6
 
-        nature_objects = await get_services_geojson(territory_id, service_type_id=4)
+        nature_objects = await self.urban_db_api.get_services_geojson(territory_id, service_type_id=4)
         features = nature_objects.get("features", [])
         if not features:
             recreation_part = 0.0
@@ -391,5 +378,5 @@ class IndicatorsService:
             "information_source": "modeled",
         }
 
-        computed = await put_indicator_value(payload)
+        computed = await self.urban_db_api.put_indicator_value(payload)
         return computed

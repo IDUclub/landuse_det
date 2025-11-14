@@ -6,7 +6,6 @@ import jwt
 from fastapi import HTTPException
 
 from landuse_app import config
-from storage.caching import caching_service
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +129,7 @@ class AuthService:
         return tokens["access_token"]
 
 
-class UrbanDbAPI:
+class RequestHandler:
     def __init__(self, api_base: str, auth_service: AuthService, cache_service=None):
         self.url = api_base
         self.auth = auth_service
@@ -203,10 +202,3 @@ class UrbanDbAPI:
                 logger.error("PUT %s failed: %s", path, text)
                 raise HTTPException(resp.status, f"Urban API PUT error: {text}")
 
-
-auth_svc = AuthService(auth_base_url=config.get("AUTH_SERVICE_URL"))
-urban_db_api = UrbanDbAPI(
-    api_base=config.get("URBAN_API"),
-    auth_service=auth_svc,
-    cache_service=caching_service,
-)

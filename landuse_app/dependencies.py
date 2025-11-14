@@ -14,7 +14,14 @@ from loguru import logger
 from landuse_app import config
 # from landuse_app.dependencies import consumer
 from landuse_app.handlers import list_of_routes
+from landuse_app.logic.api.urban_db_api_client import RequestHandler, AuthService
+from landuse_app.logic.helpers import IndicatorsService
+from landuse_app.logic.helpers.interpretation_service import InterpretationService
+from landuse_app.logic.helpers.preprocessing_service import PreProcessingService
 from landuse_app.logic.helpers.renovation_potential import RenovationPotential
+from landuse_app.logic.helpers.spatial_methods import SpatialMethods
+from landuse_app.logic.helpers.territories_urbanization import TerritoriesUrbanization
+from landuse_app.logic.helpers.urban_api_access import UrbanAPIAccess
 from storage.caching import CachingService
 
 logger.add(
@@ -82,7 +89,21 @@ app = get_app()
 
 cache_enabled = config.get_bool("CACHE_ENABLED")  # должен вернуть True или False
 caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
-renovation_potential = RenovationPotential(caching_service)
+
+
+
+requests_handler = RequestHandler(config.get("URBAN_API"), config.get("AUTH_SERVICE_URL"), caching_service)
+auth_service = AuthService(config.get("AUTH_SERVICE_URL"))
+urban_api = UrbanAPIAccess(requests_handler)
+
+spatial_methods = SpatialMethods()
+indicators_service = IndicatorsService(urban_api, spatial_methods)
+interpretation_service = InterpretationService()
+preprocessing_service = PreProcessingService(urban_api)
+renovation_potential = RenovationPotential(caching_service, interpretation_service, urban_api, preprocessing_service)
+territory_urbanization = TerritoriesUrbanization(caching_service, urban_api, preprocessing_service, renovation_potential)
+
+
 
 consumer = ConsumerWrapper()
 producer = ProducerWrapper()

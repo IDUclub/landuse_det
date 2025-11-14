@@ -7,25 +7,19 @@ import pandas as pd
 from loguru import logger
 from pandarallel import pandarallel
 
-from storage.caching import CachingService
+
 
 from ..constants import actual_zone_mapping
-from .preprocessing_service import data_extraction
-from .renovation_potential import (
-    assign_development_type,
-    process_zones_with_bulk_update,
-)
-from .urban_api_access import (
-    check_urbanization_indicator_exists,
-    get_functional_zone_sources_territory_id,
-    put_indicator_value,
-)
+from ...dependencies import urban_api, caching_service, preprocessing_service, renovation_potential
 
 pandarallel.initialize(progress_bar=False, nb_workers=4)
 
 class TerritoriesUrbanization:
-    def __init__(self, caching_service: CachingService):
-        self.caching_service = caching_service
+    def __init__(self, caching_services: caching_service, urban_db_api: urban_api, preprocess: preprocessing_service, renovation: renovation_potential):
+        self.caching_service = caching_services
+        self.urban_db_api = urban_db_api
+        self.preprocess = preprocess
+        self.renovation = renovation
 
 
     async def get_territory_renovation_potential(
@@ -58,7 +52,7 @@ class TerritoriesUrbanization:
         """
 
         if source is None:
-            source_data = await get_functional_zone_sources_territory_id(territory_id)
+            source_data = await self.urban_db_api.get_functional_zone_sources_territory_id(territory_id)
             source_key = source_data["source"]
         else:
             source_key = source
@@ -74,8 +68,8 @@ class TerritoriesUrbanization:
             return gpd.GeoDataFrame.from_features(cached_data, crs="EPSG:4326")
 
         physical_objects_dict, landuse_polygons = await asyncio.gather(
-            data_extraction.extract_physical_objects_from_territory(territory_id),
-            data_extraction.extract_landuse_from_territory(territory_id, source),
+            self.preprocess.extract_physical_objects_from_territory(territory_id),
+            self.preprocess.extract_landuse_from_territory(territory_id, source),
         )
         logger.success("Physical objects are loaded")
         physical_objects = physical_objects_dict["physical_objects"]
@@ -83,7 +77,7 @@ class TerritoriesUrbanization:
         physical_objects = physical_objects.to_crs(utm_crs)
         landuse_polygons = landuse_polygons.to_crs(utm_crs)
 
-        services_gdf = await data_extraction.extract_services(territory_id)
+        services_gdf = await self.preprocess.extract_services(territory_id)
         if services_gdf.empty:
             combined_gdf = physical_objects.copy()
         else:
@@ -106,12 +100,12 @@ class TerritoriesUrbanization:
         landuse_polygons["Любые здания /на зону"] = 0.0
         logger.success("Functional zones and physical objects are filtered")
 
-        landuse_polygons = await process_zones_with_bulk_update(
+        landuse_polygons = await self.renovation.process_zones_with_bulk_update(
             landuse_polygons, physical_objects, actual_zone_mapping
         )
         logger.success("Building percentages are calculated")
 
-        landuse_polygons = await assign_development_type(landuse_polygons)
+        landuse_polygons = await self.renovation.assign_development_type(landuse_polygons)
         logger.success("Urbanization level is calculated")
 
         zones = landuse_polygons.to_crs(utm_crs)
@@ -224,7 +218,7 @@ class TerritoriesUrbanization:
         """
         logger.info(f"Started calculation for territory {territory_id}")
         if not force_recalculate:
-            existing_indicator = await check_urbanization_indicator_exists(territory_id)
+            existing_indicator = await self.urban_db_api.check_urbanization_indicator_exists(territory_id)
             if existing_indicator is not None:
                 logger.info(
                     f"Indicator already exists in Urban DB, returning existing value"
@@ -240,5 +234,5 @@ class TerritoriesUrbanization:
         computed_indicator = await self.compute_urbanization_indicator(
             landuse_polygons, territory_id
         )
-        saved_indicator = await put_indicator_value(computed_indicator)
+        saved_indicator = await self.urban_db_api.put_indicator_value(computed_indicator)
         return saved_indicator

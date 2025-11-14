@@ -2,7 +2,7 @@ import uvicorn
 
 from landuse_app import config
 
-
+#FIXME Переработать main
 def main():
     print(f"Starting {config.get('API_TITLE')} version {config.get('VERSION')}")
     print(f"Description: {config.get('API_DESCRIPTION')}")
