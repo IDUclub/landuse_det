@@ -302,6 +302,22 @@ async def calculate_project_area_indicator(
     )
     return project_area
 
+@indicators_router.post(
+    "/indicators/{project_id}/calculate_scenario_area_indicator",
+    description="Calculate and store the area indicator for a given project in Urban DB.",
+)
+async def calculate_scenario_area_indicator(
+    project_id: int = Path(description="The unique identifier of the territory."),
+    force_recalculate: bool = Query(
+        False,
+        description="If True, forces recalculation even if the indicator already exists.",
+    ),
+):
+    project_area = await IndicatorsService.calculate_scenario_territory_area(
+        project_id, force_recalculate=force_recalculate
+    )
+    return project_area
+
 
 @indicators_router.post(
     path="/indicators/{territory_id}/population_density_indicator",

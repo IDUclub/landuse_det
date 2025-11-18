@@ -22,7 +22,7 @@ from landuse_app.logic.helpers.urban_api_access import (
     get_target_cities,
     get_territory_boundaries,
     put_indicator_value,
-    put_project_indicator,
+    put_project_indicator, get_scenario_info, check_scenario_indicator_exist,
 )
 
 
@@ -118,12 +118,11 @@ class IndicatorsService:
         area_km2 = round(area_km2, 2)
 
         scenario_id = territory_gdf["scenario_id"].loc[0]
-        territory_id = territory_gdf["territory_id"].loc[0]
 
         payload = {
             "indicator_id": 4,
             "scenario_id": int(scenario_id),
-            "territory_id": int(territory_id),
+            "territory_id": None,
             "hexagon_id": None,
             "value": float(area_km2),
             "comment": "--",
@@ -131,6 +130,47 @@ class IndicatorsService:
             "properties": {},
         }
         logger.info(f"Calculation for project id {project_id} successful")
+
+        computed_indicator = await put_project_indicator(scenario_id, payload)
+
+        return computed_indicator
+
+    @staticmethod
+    async def calculate_scenario_territory_area(
+            scenario_id: int, force_recalculate: bool = False
+    ) -> dict:
+        logger.info(f"Started calculation for project id {scenario_id}")
+        scenario_info = await get_scenario_info(scenario_id)
+        project_id = scenario_info["project"]["project_id"]
+        if not force_recalculate:
+            existing_indicator = await check_scenario_indicator_exist(
+                scenario_id, indicator_id=4
+            )
+            if existing_indicator is not None:
+                logger.info(
+                    f"Indicator already exists in Urban DB, returning existing value"
+                )
+                return existing_indicator
+        territory_data = await get_projects_territory(project_id)
+        territory_gdf = await SpatialMethods.to_project_gdf(territory_data)
+
+        geom = territory_gdf.geometry.iloc[0]
+        area_km2 = await SpatialMethods.compute_area(geom)
+        area_km2 = round(area_km2, 2)
+
+        # scenario_id = territory_gdf["scenario_id"].loc[0]
+
+        payload = {
+            "indicator_id": 4,
+            "scenario_id": int(scenario_id),
+            "territory_id": None,
+            "hexagon_id": None,
+            "value": float(area_km2),
+            "comment": "--",
+            "information_source": "modeled",
+            "properties": {},
+        }
+        logger.info(f"Calculation for SCENARIO {scenario_id} successful")
 
         computed_indicator = await put_project_indicator(scenario_id, payload)
 

@@ -627,6 +627,25 @@ async def check_project_indicator_exist(
         return None
     return data
 
+async def check_scenario_indicator_exist(
+    scenario_id: int, indicator_id: int,
+) -> dict | None:
+    """
+    Attempts to retrieve an existing indicator from the database.
+
+    Returns:
+      - dict: The indicator JSON if the response status is 200.
+      - None: If the response status is 404 (i.e., the indicator does not exist).
+    """
+    endpoint = (
+        f"/api/v1/scenarios/{scenario_id}/indicators_values"
+        f"?indicator_ids={indicator_id}"
+    )
+    data = await urban_db_api.get(endpoint, ignore_404=True)
+    if not data:
+        return None
+    return data
+
 
 async def put_project_indicator(
     scenario_id: int,
@@ -644,3 +663,17 @@ async def put_project_indicator(
         override_token=override_token,
         extra_headers=extra_headers,
     )
+
+async def get_scenario_info(target_scenario_id: int) -> dict:
+
+    url = f"/api/v1/scenarios/{target_scenario_id}"
+    try:
+        response = await urban_db_api.get(url)
+        return response
+    except Exception as e:
+        logger.exception(e)
+        raise http_exception(
+            404,
+            f"Scenario info for ID {target_scenario_id}  is missing",
+            _input={"target_scenario_id": target_scenario_id}
+        ) from e
