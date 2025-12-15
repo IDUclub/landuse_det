@@ -5,13 +5,13 @@ import pandas as pd
 from loguru import logger
 from shapely.geometry import shape
 
-from ...dependencies import urban_api
+from .urban_api_access import UrbanAPIAccess
 from ...exceptions.http_exception_wrapper import http_exception
 from ..constants.constants import ZONE_CLASS_BY_ID
 
 
 class PreProcessingService:
-    def __init__(self, urban_db_api: urban_api):
+    def __init__(self, urban_db_api: UrbanAPIAccess):
         self.urban_db_api = urban_db_api
 
     async def extract_physical_objects(

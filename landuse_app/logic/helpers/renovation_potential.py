@@ -10,7 +10,10 @@ from pandarallel import pandarallel
 from shapely import MultiPolygon, Polygon
 
 from landuse_app.schemas import GeoJSON, Profile
-from ...dependencies import caching_service, interpretation_service, urban_api, preprocessing_service
+from storage.caching import CachingService
+from .interpretation_service import InterpretationService
+from .preprocessing_service import PreProcessingService
+from .urban_api_access import UrbanAPIAccess
 # from storage.caching import CachingService
 
 from ...exceptions.http_exception_wrapper import http_exception
@@ -21,7 +24,13 @@ from .spatial_methods import SpatialMethods
 pandarallel.initialize(progress_bar=False, nb_workers=4)
 
 class RenovationPotential:
-    def __init__(self, caching: caching_service, interpretation: interpretation_service, urban_api_access: urban_api, preprocessing: preprocessing_service):
+    def __init__(
+        self,
+        caching: CachingService,
+        interpretation: InterpretationService,
+        urban_api_access:UrbanAPIAccess,
+        preprocessing: PreProcessingService
+    ):
         self.caching = caching
         self.interpretation = interpretation
         self.preprocessing = preprocessing
@@ -790,10 +799,10 @@ class RenovationPotential:
             and not landuse_polygons["Неудобия"].isna().iloc[0]
             else None
         )
-        landuse_polygons = await interpretation_service.interpret_urbanization_value(
+        landuse_polygons = await self.interpretation.interpret_urbanization_value(
             landuse_polygons
         )
-        landuse_polygons = await interpretation_service.interpret_renovation_value(
+        landuse_polygons = await self.interpretation.interpret_renovation_value(
             landuse_polygons
         )
         landuse_polygons = await self.filter_response(landuse_polygons, True)
@@ -812,10 +821,10 @@ class RenovationPotential:
         landuse_polygons = await self.get_renovation_potential(
             scenario_id, is_context=False, source=source, year=year
         )
-        landuse_polygons = await interpretation_service.interpret_urbanization_value(
+        landuse_polygons = await self.interpretation.interpret_urbanization_value(
             landuse_polygons
         )
-        landuse_polygons = await interpretation_service.interpret_renovation_value(
+        landuse_polygons = await self.interpretation.interpret_renovation_value(
             landuse_polygons
         )
         landuse_polygons = await self.filter_response(landuse_polygons)
@@ -837,10 +846,10 @@ class RenovationPotential:
             and not landuse_polygons["Неудобия"].isna().iloc[0]
             else None
         )
-        landuse_polygons = await interpretation_service.interpret_urbanization_value(
+        landuse_polygons = await self.interpretation.interpret_urbanization_value(
             landuse_polygons
         )
-        landuse_polygons = await interpretation_service.interpret_renovation_value(
+        landuse_polygons = await self.interpretation.interpret_renovation_value(
             landuse_polygons
         )
         landuse_polygons = await self.filter_response(landuse_polygons, True)
@@ -859,10 +868,10 @@ class RenovationPotential:
         landuse_polygons = await self.get_renovation_potential(
             scenario_id, is_context=True, source=source, year=year
         )
-        landuse_polygons = await interpretation_service.interpret_urbanization_value(
+        landuse_polygons = await self.interpretation.interpret_urbanization_value(
             landuse_polygons
         )
-        landuse_polygons = await interpretation_service.interpret_renovation_value(
+        landuse_polygons = await self.interpretation.interpret_renovation_value(
             landuse_polygons
         )
         landuse_polygons = await self.filter_response(landuse_polygons)

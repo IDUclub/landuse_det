@@ -7,16 +7,23 @@ import pandas as pd
 from loguru import logger
 from pandarallel import pandarallel
 
-
-
+from storage.caching import CachingService
+from .preprocessing_service import PreProcessingService
+from .renovation_potential import RenovationPotential
+from .urban_api_access import UrbanAPIAccess
 from ..constants import actual_zone_mapping
-from ...dependencies import urban_api, caching_service, preprocessing_service, renovation_potential
 
 pandarallel.initialize(progress_bar=False, nb_workers=4)
 
 class TerritoriesUrbanization:
-    def __init__(self, caching_services: caching_service, urban_db_api: urban_api, preprocess: preprocessing_service, renovation: renovation_potential):
-        self.caching_service = caching_services
+    def __init__(
+            self,
+            caching: CachingService,
+            urban_db_api: UrbanAPIAccess,
+            preprocess: PreProcessingService,
+            renovation: RenovationPotential
+                 ):
+        self.caching_service = caching
         self.urban_db_api = urban_db_api
         self.preprocess = preprocess
         self.renovation = renovation

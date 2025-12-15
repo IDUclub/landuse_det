@@ -1,16 +1,18 @@
 import asyncio
 
 import pandas as pd
+from iduconfig import Config
 from loguru import logger
 
-from landuse_app import config
+# from landuse_app import config
 from landuse_app.exceptions.http_exception_wrapper import http_exception
 from landuse_app.logic.api.urban_db_api_client import RequestHandler
 
 
 class UrbanAPIAccess:
-    def __init__(self, requests_handler: RequestHandler):
+    def __init__(self, requests_handler: RequestHandler, config: Config):
         self.requests_handler = requests_handler
+        self.config = config
 
     async def get_projects_territory(self, project_id: int) -> dict:
         """
@@ -23,7 +25,7 @@ class UrbanAPIAccess:
         dict: Territory information.
         """
         endpoint = f"/api/v1/projects/{project_id}/territory"
-        headers = {"Authorization": f"Bearer {config.get('ACCESS_TOKEN')}" ""}
+        headers = {"Authorization": f"Bearer {self.config.get('ACCESS_TOKEN')}" ""}
         response = await self.requests_handler.get(endpoint)
 
         if not response:
@@ -519,7 +521,7 @@ class UrbanAPIAccess:
 
 
     async def get_physical_objects_from_territory_parallel(
-        self, territory_id: int, page_size: int = int(config.get("PAGE_SIZE"))
+        self, territory_id: int
     ) -> list[dict]:
         """
         Fetch physical objects from a territory in parallel with a concurrency limit of 5.
@@ -536,6 +538,7 @@ class UrbanAPIAccess:
         Returns:
             list[dict]: A list of dictionaries, where each dictionary represents a physical object.
         """
+        page_size = int(self.config.get("PAGE_SIZE"))
         endpoint = f"/api/v1/territory/{territory_id}/physical_objects_with_geometry?page=1&page_size={page_size}"
         initial_response = await self.requests_handler.get(endpoint)
         total = initial_response.get("count", 0)

@@ -7,12 +7,17 @@ import geopandas as gpd
 from loguru import logger
 from shapely.geometry import shape
 
-from landuse_app.dependencies import urban_api, spatial_methods
 from landuse_app.exceptions.http_exception_wrapper import http_exception
+from landuse_app.logic.helpers.spatial_methods import SpatialMethods
+from landuse_app.logic.helpers.urban_api_access import UrbanAPIAccess
 
 
 class IndicatorsService:
-    def __init__(self, urban_db_api: urban_api, spatial_methods: spatial_methods):
+    def __init__(
+        self,
+        urban_db_api: UrbanAPIAccess,
+        spatial_methods: SpatialMethods
+    ):
         self.urban_db_api = urban_db_api
         self.spatial = spatial_methods
 

@@ -6,7 +6,7 @@
 # from loguru import logger
 #
 # from landuse_app import config
-# from landuse_app.dependencies import consumer
+# from landuse_app.dependencies import consumer, producer
 # from landuse_app.handlers import list_of_routes
 #
 # logger.add(
@@ -25,6 +25,7 @@
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):
 #     await consumer.start(["scenario.events"])
+#     await producer.start()
 #     yield
 #
 #
