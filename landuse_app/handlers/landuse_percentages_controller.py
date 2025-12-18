@@ -32,6 +32,6 @@ async def get_project_landuse_parts(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await renovation_potential.get_project_landuse_parts(
+    return await renovation_potential.calculate_zone_percentages(
         scenario_id, source=source, year=year
     )

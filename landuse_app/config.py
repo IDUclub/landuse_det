@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-class ApplicationConfig:
+class ConfigUtils:
     def __init__(self):
         self.env_path = Path().absolute() / f".env.{os.getenv('APP_ENV')}"
         load_dotenv(self.env_path)
@@ -30,6 +30,3 @@ class ApplicationConfig:
         else:
             lines.append(f"{key}={value}")
         self.env_path.write_text("\n".join(lines) + "\n")
-
-
-config = ApplicationConfig()

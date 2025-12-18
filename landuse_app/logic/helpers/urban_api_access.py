@@ -4,7 +4,6 @@ import pandas as pd
 from iduconfig import Config
 from loguru import logger
 
-# from landuse_app import config
 from landuse_app.exceptions.http_exception_wrapper import http_exception
 from landuse_app.logic.api.urban_db_api_client import RequestHandler
 
@@ -519,7 +518,6 @@ class UrbanAPIAccess:
         endpoint = "/api/v1/indicator_value"
         return await self.requests_handler.put(endpoint, data=indicator_data)
 
-
     async def get_physical_objects_from_territory_parallel(
         self, territory_id: int
     ) -> list[dict]:
@@ -654,3 +652,9 @@ class UrbanAPIAccess:
             override_token=override_token,
             extra_headers=extra_headers,
         )
+
+    async def get_scenario_info(self, target_scenario_id: int) -> dict:
+        url = f"/api/v1/scenarios/{target_scenario_id}"
+        response = await self.requests_handler.get(url)
+        return response
+

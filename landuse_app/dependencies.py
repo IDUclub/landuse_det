@@ -5,6 +5,8 @@ from landuse_app.common.consumer_wrapper import ConsumerWrapper
 from landuse_app.common.producer_wrapper import ProducerWrapper
 from loguru import logger
 from iduconfig import Config
+
+from landuse_app.config import ConfigUtils
 from landuse_app.logic.api.urban_db_api_client import RequestHandler, AuthService
 from landuse_app.logic.helpers.indicators_service import IndicatorsService
 from landuse_app.logic.helpers.interpretation_service import InterpretationService
@@ -28,8 +30,8 @@ logger.add(
 cache_enabled = bool(config.get("CACHE_ENABLED"))
 caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
 
-
-auth_service = AuthService(config.get("AUTH_SERVICE_URL"))
+utilscofig = ConfigUtils()
+auth_service = AuthService(config.get("AUTH_SERVICE_URL"), config, utilscofig)
 requests_handler = RequestHandler(config.get("URBAN_API"), auth_service, caching_service)
 
 urban_api = UrbanAPIAccess(requests_handler, config)
@@ -45,5 +47,5 @@ consumer = ConsumerWrapper()
 producer = ProducerWrapper()
 
 consumer.register_handler(
-    BaseScenarioCreatedHandler()
+    BaseScenarioCreatedHandler(renovation_potential, producer.producer_service)
 )

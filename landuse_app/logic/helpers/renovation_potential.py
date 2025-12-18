@@ -705,8 +705,8 @@ class RenovationPotential:
             dict: A dictionary with the percentages for each unique landuse zone.
         """
         physical_objects_dict, landuse_polygons = await asyncio.gather(
-            self.interpretation.extract_physical_objects(scenario_id, is_context),
-            self.interpretation.extract_landuse(scenario_id, is_context, source, year),
+            self.preprocessing.extract_physical_objects(scenario_id, is_context),
+            self.preprocessing.extract_landuse(scenario_id, is_context, source, year),
         )
 
         water_objects = physical_objects_dict["water_objects"]

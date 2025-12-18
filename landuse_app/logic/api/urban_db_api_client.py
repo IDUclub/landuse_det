@@ -4,17 +4,26 @@ import time
 import aiohttp
 import jwt
 from fastapi import HTTPException
+from iduconfig import Config
 
-from landuse_app import config
+from landuse_app.config import ConfigUtils
 
 logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def __init__(self, auth_base_url: str):
+    def __init__(
+        self,
+        auth_base_url: str,
+        iduconfig: Config,
+        utilsconfig: ConfigUtils
+    ):
+
         self.introspect_url = f"{auth_base_url}/introspect/"
         self.refresh_url = f"{auth_base_url}/refresh_token/"
         self.token_url = f"{auth_base_url}/token/"
+        self.iduconfig = iduconfig
+        self.utilsconfig = utilsconfig
 
     async def _introspect(self, token: str) -> bool:
         async with aiohttp.ClientSession() as sess:
@@ -61,8 +70,8 @@ class AuthService:
         """
         Request to /token/ using password-flow, using login/password from config
         """
-        username = config.get("AUTH_USERNAME")
-        password = config.get("AUTH_PASSWORD")
+        username = self.iduconfig.get("AUTH_USERNAME")
+        password = self.iduconfig.get("AUTH_PASSWORD")
         if not username or not password:
             raise HTTPException(500, "Missing AUTH_USERNAME/AUTH_PASSWORD in config")
 
@@ -98,8 +107,8 @@ class AuthService:
         3) If introspect return False or access token is expired — refresh.
         4) Setting new tokens and returning access_token.
         """
-        access = config.get("ACCESS_TOKEN") or ""
-        refresh = config.get("REFRESH_TOKEN") or ""
+        access = self.iduconfig.get("ACCESS_TOKEN") or ""
+        refresh = self.iduconfig.get("REFRESH_TOKEN") or ""
 
         if self._is_jwt_expired(refresh):
             logger.info("Local: refresh token expired, falling back to password grant")
@@ -123,8 +132,8 @@ class AuthService:
                 else:
                     raise
 
-        config.set("ACCESS_TOKEN", tokens["access_token"])
-        config.set("REFRESH_TOKEN", tokens["refresh_token"])
+        self.utilsconfig.set("ACCESS_TOKEN", tokens["access_token"])
+        self.utilsconfig.set("REFRESH_TOKEN", tokens["refresh_token"])
         logger.info("Tokens updated (expires_in=%s)", tokens.get("expires_in"))
         return tokens["access_token"]
 
