@@ -86,5 +86,5 @@ class CachingService:
         self.save_cache(data, file_path)
 
 
-cache_enabled = config.get_bool("CACHE_ENABLED")  # должен вернуть True или False
-caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
+# cache_enabled = config.get_bool("CACHE_ENABLED")  # должен вернуть True или False
+# caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
