@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 
 
-application = FastAPI(
+app = FastAPI(
     title="Landuse Det API",
     description="API for neudoby index",
     lifespan=lifespan,
@@ -42,7 +42,7 @@ application = FastAPI(
 
 origins = ["*"]
 
-application.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
@@ -50,7 +50,7 @@ application.add_middleware(
     allow_headers=["*"],
 )
 
-@application.get("/", include_in_schema=False)
+@app.get("/", include_in_schema=False)
 async def read_root():
     return RedirectResponse("/docs")
 
@@ -59,4 +59,4 @@ async def read_root():
 # for controller in controllers:
 #     application.include_router(controller.router)
 for controller in controllers:
-    application.include_router(controller)
+    app.include_router(controller)
