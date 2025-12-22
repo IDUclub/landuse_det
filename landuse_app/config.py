@@ -4,10 +4,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-class ApplicationConfig:
+class ConfigUtils:
     def __init__(self):
         self.env_path = Path().absolute() / f".env.{os.getenv('APP_ENV')}"
         load_dotenv(self.env_path)
+        print(f"Loaded .env.{os.getenv('APP_ENV')}")
+        print(os.getenv("KAFKA_GROUP_ID"))
 
     def get(self, key: str) -> str | None:
         return os.getenv(key)
@@ -28,6 +30,3 @@ class ApplicationConfig:
         else:
             lines.append(f"{key}={value}")
         self.env_path.write_text("\n".join(lines) + "\n")
-
-
-config = ApplicationConfig()

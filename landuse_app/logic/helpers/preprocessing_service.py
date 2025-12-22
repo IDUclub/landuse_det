@@ -5,21 +5,17 @@ import pandas as pd
 from loguru import logger
 from shapely.geometry import shape
 
+from .urban_api_access import UrbanAPIAccess
 from ...exceptions.http_exception_wrapper import http_exception
 from ..constants.constants import ZONE_CLASS_BY_ID
-from .urban_api_access import (
-    get_all_physical_objects_geometries,
-    get_functional_zones_scenario_id,
-    get_functional_zones_territory_id,
-    get_physical_objects_from_territory_parallel,
-    get_services_geojson,
-)
 
 
 class PreProcessingService:
-    @staticmethod
+    def __init__(self, urban_db_api: UrbanAPIAccess):
+        self.urban_db_api = urban_db_api
+
     async def extract_physical_objects(
-        scenario_id: int, is_context: bool
+            self, scenario_id: int, is_context: bool
     ) -> dict[str, gpd.GeoDataFrame]:
         """
         Extracts and processes physical objects for a given scenario from GeoJson,
@@ -36,9 +32,12 @@ class PreProcessingService:
             Dictionary with processed GeoDataFrame with areas of water, green (grass) and forest objects.
         """
         logger.info("Loading physical objects")
-        resp = await get_all_physical_objects_geometries(scenario_id, is_context)
+        resp = await self.urban_db_api.get_all_physical_objects_geometries(
+            scenario_id, is_context
+        )
 
         all_data: list[dict] = []
+
         for feature in resp.get("features", []):
             geom_json = feature.get("geometry")
             props = feature.get("properties", {})
@@ -93,7 +92,7 @@ class PreProcessingService:
                             "category": "residential",
                             "storeys_count": final_floors,
                             "living_area": b_props.get("living_area_official")
-                            or b_props.get("living_area_modeled"),
+                                           or b_props.get("living_area_modeled"),
                             "address": b_props.get("address", props.get("address")),
                         }
                     )
@@ -131,7 +130,15 @@ class PreProcessingService:
         ).drop_duplicates("physical_object_id")
         gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
 
-        local_crs = gdf.estimate_utm_crs()
+        if gdf.empty:
+            raise http_exception(404,
+                "Physical objects GeoDataFrame is empty after filtering polygons."
+            )
+        try:
+            local_crs = gdf.estimate_utm_crs()
+        except ValueError as e:
+            raise http_exception(500, f"Failed to estimate UTM CRS: {e}")
+
         water = (
             gdf[gdf["object_type_id"].isin([45, 2, 44])].to_crs(local_crs).area.sum()
         )
@@ -145,9 +152,8 @@ class PreProcessingService:
             "forests": forests,
         }
 
-    @staticmethod
     async def extract_landuse(
-        scenario_id: int, is_context: bool, source: str = None, year: int = None
+        self, scenario_id: int, is_context: bool, source: str = None, year: int = None
     ) -> gpd.GeoDataFrame:
         """
         Extracts functional zones polygons for a given scenario and returns them as a GeoDataFrame.
@@ -168,7 +174,7 @@ class PreProcessingService:
         ValueError
             If the input data is malformed or invalid.
         """
-        geojson_data = await get_functional_zones_scenario_id(
+        geojson_data = await self.urban_db_api.get_functional_zones_scenario_id(
             scenario_id, is_context, source, year
         )
         logger.info("Functional zones loading")
@@ -332,8 +338,9 @@ class PreProcessingService:
 
         return [object_data]
 
-    @staticmethod
+
     async def extract_physical_objects_from_territory(
+        self,
         territory_id: int,
     ) -> dict[str, gpd.GeoDataFrame]:
         """
@@ -353,7 +360,7 @@ class PreProcessingService:
                 - "forests": total area of forest objects (in square meters)
         """
         logger.info("Physical objects are loading with parallel processing")
-        raw_objects = await get_physical_objects_from_territory_parallel(territory_id)
+        raw_objects = await self.urban_db_api.get_physical_objects_from_territory_parallel(territory_id)
         all_data = []
 
         for obj in raw_objects:
@@ -403,8 +410,9 @@ class PreProcessingService:
             "forests": forests_gdf.area.sum(),
         }
 
-    @staticmethod
+
     async def extract_landuse_from_territory(
+        self,
         territory_id,
         source: str = None,
     ) -> gpd.GeoDataFrame:
@@ -427,7 +435,7 @@ class PreProcessingService:
         ValueError
             If the input data is malformed or invalid.
         """
-        geojson_data = await get_functional_zones_territory_id(territory_id, source)
+        geojson_data = await self.urban_db_api.get_functional_zones_territory_id(territory_id, source)
         logger.info("Functional zones are loading")
 
         features = geojson_data
@@ -514,8 +522,9 @@ class PreProcessingService:
         logger.success("Functional zones are loaded")
         return landuse_polygons
 
-    @staticmethod
+
     async def extract_services(
+        self,
         territory_id: int, service_type_ids=None
     ) -> gpd.GeoDataFrame:
         """
@@ -545,7 +554,7 @@ class PreProcessingService:
         all_features: list[dict[str, any]] = []
 
         for service_type in service_type_ids:
-            resp = await get_services_geojson(territory_id, service_type)
+            resp = await self.urban_db_api.get_services_geojson(territory_id, service_type)
             features = resp.get("features") or resp.get("results") or []
             all_features.extend(features)
 
@@ -598,4 +607,3 @@ class PreProcessingService:
         return gdf
 
 
-data_extraction = PreProcessingService()
