@@ -116,11 +116,11 @@ class IndicatorsService:
         payload = {
             "indicator_id": 4,
             "scenario_id": int(scenario_id),
-            "territory_id": int(territory_id),
+            "territory_id": None,
             "hexagon_id": None,
             "value": float(area_km2),
             "comment": "--",
-            "information_source": "modeled",
+            "information_source": "landuse_det",
             "properties": {},
         }
         logger.info(f"Calculation for project id {project_id} successful")

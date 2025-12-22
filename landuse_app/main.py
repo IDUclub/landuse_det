@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-
+from starlette.responses import RedirectResponse
 
 from landuse_app.dependencies import consumer, producer, config
 from landuse_app.handlers.indicators_controller import indicators_router
@@ -24,7 +24,11 @@ controllers = [indicators_router, landuse_percentages_router, urbanization_route
 async def lifespan(app: FastAPI):
     await consumer.start(["scenario.events"])
     await producer.start()
-    yield
+    try:
+        yield
+    finally:
+        await consumer.stop()
+        await producer.stop()
 
 
 
@@ -33,6 +37,7 @@ application = FastAPI(
     description="API for neudoby index",
     lifespan=lifespan,
     version="0.1.1",
+    redirect_slashes=False
 )
 
 origins = ["*"]
@@ -44,6 +49,10 @@ application.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@application.get("/", include_in_schema=False)
+async def read_root():
+    return RedirectResponse("/docs")
 
 # application.include_router(admin_router)
 

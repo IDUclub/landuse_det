@@ -15,7 +15,7 @@ class PreProcessingService:
         self.urban_db_api = urban_db_api
 
     async def extract_physical_objects(
-        self, scenario_id: int, is_context: bool
+            self, scenario_id: int, is_context: bool
     ) -> dict[str, gpd.GeoDataFrame]:
         """
         Extracts and processes physical objects for a given scenario from GeoJson,
@@ -32,9 +32,12 @@ class PreProcessingService:
             Dictionary with processed GeoDataFrame with areas of water, green (grass) and forest objects.
         """
         logger.info("Loading physical objects")
-        resp = await self.urban_db_api.get_all_physical_objects_geometries(scenario_id, is_context)
+        resp = await self.urban_db_api.get_all_physical_objects_geometries(
+            scenario_id, is_context
+        )
 
         all_data: list[dict] = []
+
         for feature in resp.get("features", []):
             geom_json = feature.get("geometry")
             props = feature.get("properties", {})
@@ -89,7 +92,7 @@ class PreProcessingService:
                             "category": "residential",
                             "storeys_count": final_floors,
                             "living_area": b_props.get("living_area_official")
-                            or b_props.get("living_area_modeled"),
+                                           or b_props.get("living_area_modeled"),
                             "address": b_props.get("address", props.get("address")),
                         }
                     )
@@ -127,7 +130,15 @@ class PreProcessingService:
         ).drop_duplicates("physical_object_id")
         gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
 
-        local_crs = gdf.estimate_utm_crs()
+        if gdf.empty:
+            raise http_exception(404,
+                "Physical objects GeoDataFrame is empty after filtering polygons."
+            )
+        try:
+            local_crs = gdf.estimate_utm_crs()
+        except ValueError as e:
+            raise http_exception(500, f"Failed to estimate UTM CRS: {e}")
+
         water = (
             gdf[gdf["object_type_id"].isin([45, 2, 44])].to_crs(local_crs).area.sum()
         )

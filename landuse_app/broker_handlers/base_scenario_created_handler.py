@@ -8,6 +8,7 @@ from otteroad import BaseMessageHandler
 from otteroad.consumer.handlers.base import EventT
 from otteroad.models.scenario_events.projects.BaseScenarioCreated import BaseScenarioCreated
 
+from landuse_app.logic.helpers.indicators_service import IndicatorsService
 from landuse_app.logic.helpers.urban_api_access import UrbanAPIAccess
 
 
@@ -25,12 +26,14 @@ class BaseScenarioCreatedHandler(BaseMessageHandler[BaseScenarioCreated]):
             self,
             renovation: RenovationCalculator,
             producer: Producer,
-            urban_api: UrbanAPIAccess
+            urban_api: UrbanAPIAccess,
+            indicators: IndicatorsService
 
     ):
         self.renovation = renovation
         self.producer = producer
         self.urban_api = urban_api
+        self.indicators = indicators
         super().__init__()
 
     async def on_startup(self):
@@ -46,8 +49,6 @@ class BaseScenarioCreatedHandler(BaseMessageHandler[BaseScenarioCreated]):
         result = await self.renovation.calculate_zone_percentages(
             event.base_scenario_id
         )
-        project_territory_response = await self.urban_api.get_projects_territory(event.project_id)
-        territory_id = project_territory_response["project_territory_id"]
         for zone_name, value in result.items():
             indicator_id = LAND_CATEGORY_NAME_TO_ID.get(zone_name)
             if indicator_id is None:
@@ -59,22 +60,24 @@ class BaseScenarioCreatedHandler(BaseMessageHandler[BaseScenarioCreated]):
             payload = {
                 "indicator_id": indicator_id,
                 "scenario_id": int(event.base_scenario_id),
-                "territory_id": int(territory_id),
+                "territory_id": None,
                 "hexagon_id": None,
                 "value": float(value),
                 "comment": "--",
-                "information_source": "modeled",
+                "information_source": "landuse_det",
                 "properties": {},
             }
-            logger.info(
-                f"Sending indicator {indicator_id} "
-                f"for scenario id {event.base_scenario_id}"
-            )
-
             await self.urban_api.put_project_indicator(
                 event.base_scenario_id,
                 payload
             )
+            logger.info(
+                f"Sending indicator {indicator_id} with name {zone_name} and value {value}"
+                f"for scenario id {event.base_scenario_id}"
+            )
 
-        logger.info(f"Calculation for scenario id {event.base_scenario_id} successful")
+        logger.info(f"Started project area calculation for {event.base_scenario_id}")
+        await self.indicators.calculate_project_territory_area(project_id=event.project_id, force_recalculate=True)
+
+        logger.info(f"AREA and ZONE BALANCE indicators for base scenario id {event.base_scenario_id} successful")
         return result

@@ -47,5 +47,5 @@ consumer = ConsumerWrapper()
 producer = ProducerWrapper()
 
 consumer.register_handler(
-    BaseScenarioCreatedHandler(renovation_potential, producer.producer_service)
+    BaseScenarioCreatedHandler(renovation_potential, producer.producer_service, urban_api, indicators_service)
 )
