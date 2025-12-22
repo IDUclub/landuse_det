@@ -51,6 +51,32 @@ class BaseScenarioCreatedHandler(BaseMessageHandler[BaseScenarioCreated]):
         )
 
         try:
+            logger.info(
+                f"Started project area calculation for {event.base_scenario_id}"
+            )
+
+            await self.indicators.calculate_project_territory_area(
+                project_id=event.project_id,
+                force_recalculate=True,
+            )
+
+            logger.info(
+                f"AREA and ZONE BALANCE indicators for "
+                f"base scenario id {event.base_scenario_id} successful"
+            )
+
+        except Exception:
+            logger.exception(
+                "Kafka message processing failed, skipping message",
+                extra={
+                    "scenario_id": event.base_scenario_id,
+                    "project_id": event.project_id,
+                    "event_type": type(event).__name__,
+                },
+            )
+            return
+
+        try:
             result = await self.renovation.calculate_zone_percentages(
                 event.base_scenario_id
             )
@@ -84,22 +110,6 @@ class BaseScenarioCreatedHandler(BaseMessageHandler[BaseScenarioCreated]):
                     f"with name {zone_name} and value {value} "
                     f"for scenario id {event.base_scenario_id}"
                 )
-
-            logger.info(
-                f"Started project area calculation for {event.base_scenario_id}"
-            )
-
-            await self.indicators.calculate_project_territory_area(
-                project_id=event.project_id,
-                force_recalculate=True,
-            )
-
-            logger.info(
-                f"AREA and ZONE BALANCE indicators for "
-                f"base scenario id {event.base_scenario_id} successful"
-            )
-
-            return result
 
         except Exception:
             logger.exception(
