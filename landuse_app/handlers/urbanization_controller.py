@@ -34,7 +34,7 @@ async def get_projects_urbanization_level(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await renovation_potential.get_urbanization_level(
+    return await renovation_potential.get_projects_urbanization_level(
         scenario_id, source=source, year=year
     )
 
@@ -65,6 +65,6 @@ async def get_projects_context_urbanization_level(
             f"Invalid source. Valid sources are: {', '.join(VALID_SOURCES)}",
             source,
         )
-    return await renovation_potential.get_context_urbanization_level(
+    return await renovation_potential.get_projects_context_urbanization_level(
         scenario_id, source=source, year=year
     )
