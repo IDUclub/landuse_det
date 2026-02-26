@@ -1,6 +1,3 @@
-from pathlib import Path
-
-from iduconfig import Config
 from loguru import logger
 
 from landuse_app.observability.config import PrometheusConfig
@@ -14,14 +11,16 @@ async def start_prometheus():
     Start the prometheus server
     """
 
-    logger.info(f"Starting Prometheus server on {deps.config.get('PROMETHEUS_PORT')}")
+    port = int(deps.config.get("PROMETHEUS_PORT"))
+    if deps.otel_agent is not None:
+        logger.info(f"Prometheus server already started on {port}")
+        return
+
+    logger.info(f"Starting Prometheus server on {port}")
     deps.otel_agent = OpenTelemetryAgent(
-        prometheus_config=PrometheusConfig(
-            host="0.0.0.0",
-            port=int(deps.config.get("PROMETHEUS_PORT")),
-        ),
+        prometheus_config=PrometheusConfig(host="0.0.0.0", port=port),
     )
-    logger.info(f"Prometheus server started on {deps.config.get('PROMETHEUS_PORT')}")
+    logger.info(f"Prometheus server started on {port}")
 
 
 async def shutdown_prometheus():
@@ -30,5 +29,10 @@ async def shutdown_prometheus():
     """
 
     logger.info("Shutting down Prometheus server")
+    if deps.otel_agent is None:
+        logger.info("Prometheus server was not started")
+        return
+
     deps.otel_agent.shutdown()
+    deps.otel_agent = None
     logger.info("Prometheus server was shut down")

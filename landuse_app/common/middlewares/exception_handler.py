@@ -77,6 +77,7 @@ class ExceptionHandlerMiddleware(
                     "method": request.method,
                     "path": _normalize_path(request),
                     "error_type": type(e).__name__,
+                    "status_code": 500,
                 },
             )
             return JSONResponse(

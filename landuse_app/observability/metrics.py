@@ -32,7 +32,7 @@ class Metrics:
 
 
 def setup_metrics() -> Metrics:
-    meter = metrics.get_meter("sirtep-api")
+    meter = metrics.get_meter("landuse-det")
 
     _setup_callback_metrics(meter)
 
@@ -109,6 +109,7 @@ def _get_system_metrics_callback() -> Callable[[CallbackOptions], None]:
 
 
 def _get_application_metrics_callback() -> Callable[[CallbackOptions], None]:
+    app_version = "0.1.1"
     startup_time = time.time()
 
     def application_metrics_callback(
@@ -116,9 +117,11 @@ def _get_application_metrics_callback() -> Callable[[CallbackOptions], None]:
     ):  # pylint: disable=unused-argument
         """Callback function to collect application-specific metrics"""
         # Current timestamp
-        yield Observation(startup_time, {"metric": "startup_time", "version": "0.1"})
         yield Observation(
-            time.time(), {"metric": "last_update_time", "version": "0.1"}
+            startup_time, {"metric": "startup_time", "version": app_version}
+        )
+        yield Observation(
+            time.time(), {"metric": "last_update_time", "version": app_version}
         )
 
         # Active threads

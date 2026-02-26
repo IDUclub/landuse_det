@@ -8,15 +8,21 @@ from loguru import logger
 from starlette.responses import RedirectResponse
 
 from landuse_app.dependencies import consumer, producer, config
+from landuse_app.init_entities import start_prometheus, shutdown_prometheus
 from landuse_app.handlers.indicators_controller import indicators_router
 from landuse_app.handlers.landuse_percentages_controller import landuse_percentages_router
 from landuse_app.handlers.renovation_controller import renovation_router
 from landuse_app.handlers.urbanization_controller import urbanization_router
+from landuse_app.observability.metrics import setup_metrics
+from landuse_app.common.middlewares.prometheus_handler import ObservabilityMiddleware
+from landuse_app.common.middlewares.exception_handler import ExceptionHandlerMiddleware
 
 logger.add(
     f'{config.get("LOG_FILE")}.log', colorize=False, backtrace=True, diagnose=True
 )
 controllers = [indicators_router, landuse_percentages_router, urbanization_router, renovation_router]
+
+metrics = setup_metrics()
 
 
 
@@ -24,9 +30,11 @@ controllers = [indicators_router, landuse_percentages_router, urbanization_route
 async def lifespan(app: FastAPI):
     await consumer.start(["scenario.events"])
     await producer.start()
+    await start_prometheus()
     try:
         yield
     finally:
+        await shutdown_prometheus()
         await consumer.stop()
         await producer.stop()
 
@@ -49,6 +57,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(ExceptionHandlerMiddleware, metrics=metrics)
+app.add_middleware(ObservabilityMiddleware, metrics=metrics)
 
 @app.get("/", include_in_schema=False)
 async def read_root():
