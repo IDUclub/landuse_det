@@ -15,6 +15,8 @@ from landuse_app.logic.helpers.renovation_potential import RenovationPotential
 from landuse_app.logic.helpers.spatial_methods import SpatialMethods
 from landuse_app.logic.helpers.territories_urbanization import TerritoriesUrbanization
 from landuse_app.logic.helpers.urban_api_access import UrbanAPIAccess
+from landuse_app.observability.config import PrometheusConfig
+from landuse_app.observability.otel_agent import OpenTelemetryAgent
 from storage.caching import CachingService
 
 
@@ -49,3 +51,5 @@ producer = ProducerWrapper()
 consumer.register_handler(
     BaseScenarioCreatedHandler(renovation_potential, producer.producer_service, urban_api, indicators_service)
 )
+prometheus_config=PrometheusConfig(host="0.0.0.0", port=int(config.get("PROMETHEUS_PORT")))
+otel_agent= OpenTelemetryAgent(prometheus_config)
