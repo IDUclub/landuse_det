@@ -5,7 +5,7 @@ services:
     container_name: ${CONTAINER_NAME}
     ports:
       - "8030:80"
-      - "9464:9464"
+      - "9467:9464"
     volumes:
       - /var/essdata/__landuse_cache__:/app/__landuse_cache__
     env_file:
