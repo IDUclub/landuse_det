@@ -639,7 +639,6 @@ class UrbanAPIAccess:
         scenario_id: int,
         indicator_data: dict,
         *,
-        use_token: bool = True,
         override_token: str | None = None,
         extra_headers: dict[str, str] | None = None,
     ) -> dict:
@@ -647,7 +646,6 @@ class UrbanAPIAccess:
         return await self.requests_handler.put(
             endpoint,
             data=indicator_data,
-            use_token=use_token,
             override_token=override_token,
             extra_headers=extra_headers,
         )

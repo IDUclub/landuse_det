@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from landuse_app.dependencies import indicators_service
 from landuse_app.exceptions.http_exception_wrapper import http_exception
+from landuse_app.logic.auth.security import verify_token
 from landuse_app.logic.constants.constants import VALID_SOURCES
 
 indicators_router = APIRouter(tags=["indicators"])
@@ -54,6 +55,7 @@ async def get_territory_urbanization_level(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ) -> dict | list[dict]:
     """
     Calculate and store the urbanization percentage for a given territory in Urban DB.
@@ -93,6 +95,7 @@ async def calculate_area_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ) -> dict | list[dict]:
     territory_area = await indicators_service.calculate_territory_area(
         territory_id, force_recalculate=force_recalculate
@@ -111,6 +114,7 @@ async def services_count_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ) -> dict | list[dict]:
     services_count = await indicators_service.calculate_service_count(
         territory_id, indicator_id, force_recalculate=force_recalculate
@@ -128,6 +132,7 @@ async def calculate_project_area_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     project_area = await indicators_service.calculate_project_territory_area(
         project_id, force_recalculate=force_recalculate
@@ -145,6 +150,7 @@ async def population_density_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     population_density = await indicators_service.population_density(
         territory_id, force_recalculate
@@ -162,6 +168,7 @@ async def target_cities_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     target_cities_count = await indicators_service.target_cities(
         territory_id, force_recalculate=force_recalculate
@@ -189,6 +196,7 @@ async def cities_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     big_cities_count = await indicators_service.city_size_indicator(
         territory_id, indicator_id, force_recalculate=force_recalculate
@@ -206,6 +214,7 @@ async def engineering_infrastructure_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     engineering_infrastructure_count = (
         await indicators_service.engineering_infrastructure(
@@ -229,6 +238,7 @@ async def recreation_area_indicator(
             None,
             description="The source of the landuse zones data. Available sources are: User, PZZ, OSM",
         ),
+    _token: str = Depends(verify_token),
 ):
     recreation_area = await indicators_service.recreation_area(
         territory_id, force_recalculate=force_recalculate, source=source
@@ -246,6 +256,7 @@ async def oop_indicator(
             False,
             description="If True, forces recalculation even if the indicator already exists.",
         ),
+    _token: str = Depends(verify_token),
 ):
     oopt_parts_count = await indicators_service.oopt_parts(
         territory_id, force_recalculate=force_recalculate

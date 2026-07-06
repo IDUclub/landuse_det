@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from landuse_app.dependencies import renovation_potential
 from landuse_app.exceptions.http_exception_wrapper import http_exception
+from landuse_app.logic.auth.security import verify_token
 from landuse_app.logic.constants.constants import VALID_SOURCES
 from landuse_app.schemas import GeoJSON
 
@@ -27,6 +28,7 @@ async def get_projects_urbanization_level(
         None,
         description="The year of the landuse zones data",
     ),
+    _token: str = Depends(verify_token),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
         raise http_exception(
@@ -58,6 +60,7 @@ async def get_projects_context_urbanization_level(
         None,
         description="The year of the landuse zones data",
     ),
+    _token: str = Depends(verify_token),
 ) -> GeoJSON:
     if source is not None and source not in VALID_SOURCES:
         raise http_exception(
