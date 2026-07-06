@@ -211,11 +211,10 @@ class UrbanAPIAccess:
             else f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects"
         )
 
-        try:
-            response = await self.requests_handler.get(endpoint)
-        except Exception as e:
+        response = await self.requests_handler.get(endpoint)
+        if not response:
             raise http_exception(
-                404, "No geometries found for the given scenario ID:", str(e)
+                404, "No geometries found for the given scenario ID", scenario_id
             )
 
         return response
