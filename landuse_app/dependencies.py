@@ -31,7 +31,7 @@ cache_enabled = bool(config.get("CACHE_ENABLED"))
 caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
 
 utilscofig = ConfigUtils()
-auth_service = AuthService(config.get("AUTH_SERVICE_URL"), config, utilscofig)
+auth_service = AuthService(config)
 requests_handler = RequestHandler(config.get("URBAN_API"), auth_service, caching_service)
 
 urban_api = UrbanAPIAccess(requests_handler, config)
