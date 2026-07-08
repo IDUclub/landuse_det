@@ -24,7 +24,6 @@ class UrbanAPIAccess:
         dict: Territory information.
         """
         endpoint = f"/api/v1/projects/{project_id}/territory"
-        headers = {"Authorization": f"Bearer {self.config.get('ACCESS_TOKEN')}" ""}
         response = await self.requests_handler.get(endpoint)
 
         if not response:
@@ -211,11 +210,10 @@ class UrbanAPIAccess:
             else f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects"
         )
 
-        try:
-            response = await self.requests_handler.get(endpoint)
-        except Exception as e:
+        response = await self.requests_handler.get(endpoint)
+        if not response:
             raise http_exception(
-                404, "No geometries found for the given scenario ID:", str(e)
+                404, "No geometries found for the given scenario ID", scenario_id
             )
 
         return response
@@ -640,7 +638,6 @@ class UrbanAPIAccess:
         scenario_id: int,
         indicator_data: dict,
         *,
-        use_token: bool = True,
         override_token: str | None = None,
         extra_headers: dict[str, str] | None = None,
     ) -> dict:
@@ -648,7 +645,6 @@ class UrbanAPIAccess:
         return await self.requests_handler.put(
             endpoint,
             data=indicator_data,
-            use_token=use_token,
             override_token=override_token,
             extra_headers=extra_headers,
         )
