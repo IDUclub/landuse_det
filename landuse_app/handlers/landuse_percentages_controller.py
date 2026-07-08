@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Path, Query
 
 from landuse_app.dependencies import renovation_potential
 from landuse_app.exceptions.http_exception_wrapper import http_exception
-from landuse_app.logic.auth.security import verify_token
 from landuse_app.logic.constants.constants import VALID_SOURCES
 
 landuse_percentages_router = APIRouter(tags=["landuse_percentages"])
@@ -26,7 +25,6 @@ async def get_project_landuse_parts(
         None,
         description="The year of the landuse zones data",
     ),
-    _token: str = Depends(verify_token),
 ) -> dict:
     if source is not None and source not in VALID_SOURCES:
         raise http_exception(
