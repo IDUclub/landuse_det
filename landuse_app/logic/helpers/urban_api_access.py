@@ -24,7 +24,6 @@ class UrbanAPIAccess:
         dict: Territory information.
         """
         endpoint = f"/api/v1/projects/{project_id}/territory"
-        headers = {"Authorization": f"Bearer {self.config.get('ACCESS_TOKEN')}" ""}
         response = await self.requests_handler.get(endpoint)
 
         if not response:

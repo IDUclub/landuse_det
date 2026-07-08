@@ -1,141 +1,63 @@
 import logging
-import time
 
 import aiohttp
-import jwt
 from fastapi import HTTPException
+from idu_service_auth import KeycloakTokenClient, KeycloakTokenConfig
 from iduconfig import Config
 
-from landuse_app.config import ConfigUtils
+from landuse_app.auth_context import get_current_bearer_token
 
 logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def __init__(
-        self,
-        auth_base_url: str,
-        iduconfig: Config,
-        utilsconfig: ConfigUtils
-    ):
+    """Service-to-service authentication against Keycloak.
 
-        self.introspect_url = f"{auth_base_url}/introspect/"
-        self.refresh_url = f"{auth_base_url}/refresh_token/"
-        self.token_url = f"{auth_base_url}/token/"
+    Uses the OAuth2 *client credentials* grant (service token) via
+    :class:`idu_service_auth.KeycloakTokenClient`. The client is created once and
+    kept for the whole application lifecycle; it caches the token and refreshes it
+    transparently before expiry.
+    """
+
+    def __init__(self, iduconfig: Config):
         self.iduconfig = iduconfig
-        self.utilsconfig = utilsconfig
+        auth_server_url = iduconfig.get("KEYCLOAK_URL")
+        realm = iduconfig.get("KEYCLOAK_REALM")
+        client_id = iduconfig.get("KEYCLOAK_CLIENT_ID")
+        client_secret = iduconfig.get("KEYCLOAK_CLIENT_SECRET")
 
-    async def _introspect(self, token: str) -> bool:
-        async with aiohttp.ClientSession() as sess:
-            payload = {
-                "token": token,
-                "token_type_hint": "access_token",
-                "client_id": "unknown_client",
-            }
-            headers = {
-                "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
-            async with sess.post(
-                self.introspect_url, data=payload, headers=headers
-            ) as resp:
-                if resp.status == 200:
-                    return (await resp.json()).get("active", False)
-                logger.warning(
-                    "Introspect failed %s: %s", resp.status, await resp.text()
-                )
-                return False
+        missing = [
+            name
+            for name, value in (
+                ("KEYCLOAK_URL", auth_server_url),
+                ("KEYCLOAK_REALM", realm),
+                ("KEYCLOAK_CLIENT_ID", client_id),
+                ("KEYCLOAK_CLIENT_SECRET", client_secret),
+            )
+            if not value
+        ]
+        if missing:
+            raise HTTPException(
+                500,
+                f"Missing Keycloak service credentials in config: {', '.join(missing)}",
+            )
 
-    async def _refresh(self, refresh_token: str) -> dict:
-        async with aiohttp.ClientSession() as sess:
-            payload = {
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": "unknown_client",
-            }
-            headers = {
-                "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
-            async with sess.post(
-                self.refresh_url, data=payload, headers=headers
-            ) as resp:
-                text = await resp.text()
-                if resp.status != 200:
-                    logger.error("Refresh token failed %s: %s", resp.status, text)
-                    raise HTTPException(401, f"Cannot refresh token: {text}")
-                return await resp.json()
+        self._client = KeycloakTokenClient(
+            KeycloakTokenConfig(
+                auth_server_url=auth_server_url,
+                realm=realm,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+        )
 
-    async def _password_grant(self) -> dict:
-        """
-        Request to /token/ using password-flow, using login/password from config
-        """
-        username = self.iduconfig.get("AUTH_USERNAME")
-        password = self.iduconfig.get("AUTH_PASSWORD")
-        if not username or not password:
-            raise HTTPException(500, "Missing AUTH_USERNAME/AUTH_PASSWORD in config")
+    async def get_token(self) -> str:
+        """Return a valid service access token, refreshing it if needed."""
+        return await self._client.get_access_token()
 
-        async with aiohttp.ClientSession() as sess:
-            payload = {
-                "grant_type": "password",
-                "username": username,
-                "password": password,
-                "client_id": "unknown_client",
-            }
-            headers = {
-                "accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
-            async with sess.post(self.token_url, data=payload, headers=headers) as resp:
-                text = await resp.text()
-                if resp.status != 200:
-                    logger.error("Password grant failed %s: %s", resp.status, text)
-                    raise HTTPException(401, f"Password grant error: {text}")
-                return await resp.json()
-
-    def _is_jwt_expired(self, token: str) -> bool:
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            return payload.get("exp", 0) < time.time()
-        except Exception:
-            return True
-
-    async def validate_and_refresh(self) -> str:
-        """
-        1) If refresh_token expired — trying password grant.
-        2) Otherwise, if access_token is not expired yet — introspect.
-        3) If introspect return False or access token is expired — refresh.
-        4) Setting new tokens and returning access_token.
-        """
-        access = self.iduconfig.get("ACCESS_TOKEN") or ""
-        refresh = self.iduconfig.get("REFRESH_TOKEN") or ""
-
-        if self._is_jwt_expired(refresh):
-            logger.info("Local: refresh token expired, falling back to password grant")
-            tokens = await self._password_grant()
-
-        else:
-            if not self._is_jwt_expired(access):
-                logger.info("Local: access token still valid, will introspect")
-                if await self._introspect(access):
-                    return access
-                logger.info("Introspect: access token inactive, will refresh")
-
-            try:
-                tokens = await self._refresh(refresh)
-            except HTTPException as e:
-                if "Signature has expired" in e.detail:
-                    logger.info(
-                        "Server: refresh token expired, falling back to password grant"
-                    )
-                    tokens = await self._password_grant()
-                else:
-                    raise
-
-        self.utilsconfig.set("ACCESS_TOKEN", tokens["access_token"])
-        self.utilsconfig.set("REFRESH_TOKEN", tokens["refresh_token"])
-        logger.info("Tokens updated (expires_in=%s)", tokens.get("expires_in"))
-        return tokens["access_token"]
+    async def aclose(self) -> None:
+        """Release the underlying HTTP session. Call on application shutdown."""
+        await self._client.aclose()
 
 
 class RequestHandler:
@@ -145,34 +67,43 @@ class RequestHandler:
         self.cache = cache_service
 
     async def _prepare_headers(
-        self, use_token: bool = True, override_token: str | None = None
+        self,
+        *,
+        extra_headers: dict[str, str] | None = None,
+        use_token: bool = True,
+        override_token: str | None = None,
     ) -> dict:
-        headers: dict[str, str] = {}
-        if override_token:
-            headers["Authorization"] = f"Bearer {override_token}"
-        elif use_token:
-            token = await self.auth.validate_and_refresh()
-            headers["Authorization"] = f"Bearer {token}"
+        headers = dict(extra_headers) if extra_headers else {}
+        if not use_token:
+            return headers
+
+        token = override_token or get_current_bearer_token()
+        if token is None:
+            token = await self.auth.get_token()
+
+        headers["Authorization"] = f"Bearer {token}"
         return headers
 
     async def get(
         self, path: str, params: dict = None, ignore_404: bool = False
     ) -> dict | None:
+        request_bearer_token = get_current_bearer_token()
         headers = await self._prepare_headers()
+        cache = self.cache if request_bearer_token is None else None
         key = path.strip("/").replace("/", "_")
-        if self.cache:
-            recent = self.cache.get_recent_cache_file(key, params or {})
-            if recent and self.cache.is_cache_valid(recent):
+        if cache:
+            recent = cache.get_recent_cache_file(key, params or {})
+            if recent and cache.is_cache_valid(recent):
                 logger.info("Using cache for %s", path)
-                return self.cache.load_cache(recent)
+                return cache.load_cache(recent)
 
         url = f"{self.url}{path}"
         async with aiohttp.ClientSession() as sess:
             async with sess.get(url, params=params, headers=headers) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    if self.cache:
-                        self.cache.save_with_cleanup(data, key, params or {})
+                    if cache:
+                        cache.save_with_cleanup(data, key, params or {})
                     return data
                 if ignore_404 and resp.status == 404:
                     return None
@@ -194,13 +125,11 @@ class RequestHandler:
         - extra_headers – any additional headers
         - use_token, override_token – default logic from AuthService
         """
-        headers = dict(extra_headers) if extra_headers else {}
-
-        if override_token:
-            headers["Authorization"] = f"Bearer {override_token}"
-        elif use_token:
-            token = await self.auth.validate_and_refresh()
-            headers["Authorization"] = f"Bearer {token}"
+        headers = await self._prepare_headers(
+            extra_headers=extra_headers,
+            use_token=use_token,
+            override_token=override_token,
+        )
 
         url = f"{self.url}{path}"
         async with aiohttp.ClientSession() as sess:
@@ -210,4 +139,3 @@ class RequestHandler:
                 text = await resp.text()
                 logger.error("PUT %s failed: %s", path, text)
                 raise HTTPException(resp.status, f"Urban API PUT error: {text}")
-
