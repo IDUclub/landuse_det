@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import aiohttp
@@ -9,15 +10,17 @@ from landuse_app.auth_context import get_current_bearer_token
 
 logger = logging.getLogger(__name__)
 
+_RETRYABLE_ERRORS = (
+    aiohttp.ServerDisconnectedError,
+    aiohttp.ClientConnectorError,
+    aiohttp.ClientOSError,
+    aiohttp.ClientPayloadError,
+    asyncio.TimeoutError,
+)
+
 
 class AuthService:
-    """Service-to-service authentication against Keycloak.
-
-    Uses the OAuth2 *client credentials* grant (service token) via
-    :class:`idu_service_auth.KeycloakTokenClient`. The client is created once and
-    kept for the whole application lifecycle; it caches the token and refreshes it
-    transparently before expiry.
-    """
+    """Service-to-service authentication against Keycloak."""
 
     def __init__(self, iduconfig: Config):
         self.iduconfig = iduconfig
@@ -61,10 +64,20 @@ class AuthService:
 
 
 class RequestHandler:
-    def __init__(self, api_base: str, auth_service: AuthService, cache_service=None):
+    def __init__(
+        self,
+        api_base: str,
+        auth_service: AuthService,
+        cache_service=None,
+        *,
+        timeout_seconds: int = 120,
+        retries: int = 3,
+    ):
         self.url = api_base
         self.auth = auth_service
         self.cache = cache_service
+        self.timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+        self.retries = retries
 
     async def _prepare_headers(
         self,
@@ -98,18 +111,34 @@ class RequestHandler:
                 return cache.load_cache(recent)
 
         url = f"{self.url}{path}"
-        async with aiohttp.ClientSession() as sess:
-            async with sess.get(url, params=params, headers=headers) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if cache:
-                        cache.save_with_cleanup(data, key, params or {})
-                    return data
-                if ignore_404 and resp.status == 404:
-                    return None
-                text = await resp.text()
-                logger.error("GET %s failed: %s", path, text)
-                raise HTTPException(resp.status, f"Urban API GET error: {text}")
+        last_exc: Exception | None = None
+        for attempt in range(self.retries):
+            try:
+                async with aiohttp.ClientSession(timeout=self.timeout) as sess:
+                    async with sess.get(url, params=params, headers=headers) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if cache:
+                                cache.save_with_cleanup(data, key, params or {})
+                            return data
+                        if ignore_404 and resp.status == 404:
+                            return None
+                        text = await resp.text()
+                        logger.error("GET %s failed: %s", path, text)
+                        raise HTTPException(resp.status, f"Urban API GET error: {text}")
+            except _RETRYABLE_ERRORS as exc:
+                last_exc = exc
+                logger.warning(
+                    "GET %s network error (attempt %s/%s): %s",
+                    path,
+                    attempt + 1,
+                    self.retries,
+                    exc,
+                )
+                await asyncio.sleep(1)
+
+        logger.error("GET %s failed after %s attempts: %s", path, self.retries, last_exc)
+        raise HTTPException(502, f"Urban API unavailable: {last_exc}")
 
     async def put(
         self,
@@ -120,11 +149,6 @@ class RequestHandler:
         use_token: bool = True,
         override_token: str | None = None,
     ) -> dict:
-        """
-        Async PUT-request.
-        - extra_headers – any additional headers
-        - use_token, override_token – default logic from AuthService
-        """
         headers = await self._prepare_headers(
             extra_headers=extra_headers,
             use_token=use_token,
@@ -132,10 +156,26 @@ class RequestHandler:
         )
 
         url = f"{self.url}{path}"
-        async with aiohttp.ClientSession() as sess:
-            async with sess.put(url, json=data, headers=headers) as resp:
-                if resp.status in (200, 201):
-                    return await resp.json()
-                text = await resp.text()
-                logger.error("PUT %s failed: %s", path, text)
-                raise HTTPException(resp.status, f"Urban API PUT error: {text}")
+        last_exc: Exception | None = None
+        for attempt in range(self.retries):
+            try:
+                async with aiohttp.ClientSession(timeout=self.timeout) as sess:
+                    async with sess.put(url, json=data, headers=headers) as resp:
+                        if resp.status in (200, 201):
+                            return await resp.json()
+                        text = await resp.text()
+                        logger.error("PUT %s failed: %s", path, text)
+                        raise HTTPException(resp.status, f"Urban API PUT error: {text}")
+            except _RETRYABLE_ERRORS as exc:
+                last_exc = exc
+                logger.warning(
+                    "PUT %s network error (attempt %s/%s): %s",
+                    path,
+                    attempt + 1,
+                    self.retries,
+                    exc,
+                )
+                await asyncio.sleep(1)
+
+        logger.error("PUT %s failed after %s attempts: %s", path, self.retries, last_exc)
+        raise HTTPException(502, f"Urban API unavailable: {last_exc}")

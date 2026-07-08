@@ -28,3 +28,20 @@ Endpoint for services counts indicators calculation and for given project ID
 Endpoint for application work ping
 ### /logs
 Endpoint for getting logs
+
+## Authentication
+
+The API uses Keycloak bearer tokens. For HTTP requests, the incoming
+`Authorization: Bearer <jwt>` header is forwarded to `urban_api`.
+
+For Kafka and other background flows there is no incoming frontend token, so the
+service obtains a Keycloak service token via the `client_credentials` grant.
+
+### Environment variables
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `KEYCLOAK_URL` | Keycloak base URL | - (required) |
+| `KEYCLOAK_REALM` | Keycloak realm | - (required) |
+| `KEYCLOAK_CLIENT_ID` | Service-account client id | - (required) |
+| `KEYCLOAK_CLIENT_SECRET` | Service-account client secret | - (required) |

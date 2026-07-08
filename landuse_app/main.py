@@ -11,6 +11,8 @@ from landuse_app.auth_context import (
     reset_current_bearer_token,
     set_current_bearer_token,
 )
+from landuse_app.common.middlewares.exception_handler import ExceptionHandlerMiddleware
+from landuse_app.common.middlewares.prometheus_handler import ObservabilityMiddleware
 from landuse_app.dependencies import auth_service, config, consumer, producer
 from landuse_app.handlers.indicators_controller import indicators_router
 from landuse_app.handlers.landuse_percentages_controller import (
@@ -18,6 +20,8 @@ from landuse_app.handlers.landuse_percentages_controller import (
 )
 from landuse_app.handlers.renovation_controller import renovation_router
 from landuse_app.handlers.urbanization_controller import urbanization_router
+from landuse_app.init_entities import shutdown_prometheus, start_prometheus
+from landuse_app.observability.metrics import setup_metrics
 
 logger.add(
     f'{config.get("LOG_FILE")}.log', colorize=False, backtrace=True, diagnose=True
@@ -29,14 +33,18 @@ controllers = [
     renovation_router,
 ]
 
+metrics = setup_metrics()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await consumer.start(["scenario.events"])
     await producer.start()
+    await start_prometheus()
     try:
         yield
     finally:
+        await shutdown_prometheus()
         await consumer.stop()
         await producer.stop()
         await auth_service.aclose()
@@ -59,6 +67,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(ExceptionHandlerMiddleware, metrics=metrics)
+app.add_middleware(ObservabilityMiddleware, metrics=metrics)
 
 
 @app.middleware("http")
