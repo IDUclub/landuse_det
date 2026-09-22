@@ -3,10 +3,10 @@ import logging
 
 import aiohttp
 from fastapi import HTTPException
-from idu_service_auth import KeycloakTokenClient, KeycloakTokenConfig
+from idu_service_auth import KeycloakAuthError, KeycloakTokenClient, KeycloakTokenConfig
 from iduconfig import Config
 
-from landuse_app.auth_context import get_current_bearer_token
+from landuse_app.auth_context import get_current_bearer_token, in_service_scope
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,13 @@ class AuthService:
             )
         )
 
-    async def get_token(self) -> str:
+    async def get_token(self, *, force_refresh: bool = False) -> str:
         """Return a valid service access token, refreshing it if needed."""
-        return await self._client.get_access_token()
+        try:
+            return await self._client.get_access_token(force_refresh=force_refresh)
+        except KeycloakAuthError as exc:
+            logger.error("Failed to obtain Keycloak service token: %s", exc)
+            raise HTTPException(503, f"Keycloak service token unavailable: {exc}") from exc
 
     async def aclose(self) -> None:
         """Release the underlying HTTP session. Call on application shutdown."""
@@ -85,6 +89,7 @@ class RequestHandler:
         extra_headers: dict[str, str] | None = None,
         use_token: bool = True,
         override_token: str | None = None,
+        force_refresh: bool = False,
     ) -> dict:
         headers = dict(extra_headers) if extra_headers else {}
         if not use_token:
@@ -92,17 +97,22 @@ class RequestHandler:
 
         token = override_token or get_current_bearer_token()
         if token is None:
-            token = await self.auth.get_token()
+            token = await self.auth.get_token(force_refresh=force_refresh)
 
         headers["Authorization"] = f"Bearer {token}"
         return headers
+
+    @staticmethod
+    def _uses_service_token(use_token: bool = True, override_token: str | None = None) -> bool:
+        return use_token and override_token is None and get_current_bearer_token() is None
 
     async def get(
         self, path: str, params: dict = None, ignore_404: bool = False
     ) -> dict | None:
         request_bearer_token = get_current_bearer_token()
         headers = await self._prepare_headers()
-        cache = self.cache if request_bearer_token is None else None
+        use_cache = request_bearer_token is None and not in_service_scope()
+        cache = self.cache if use_cache else None
         key = path.strip("/").replace("/", "_")
         if cache:
             recent = cache.get_recent_cache_file(key, params or {})
@@ -111,11 +121,17 @@ class RequestHandler:
                 return cache.load_cache(recent)
 
         url = f"{self.url}{path}"
+        can_refresh_token = self._uses_service_token()
         last_exc: Exception | None = None
         for attempt in range(self.retries):
             try:
                 async with aiohttp.ClientSession(timeout=self.timeout) as sess:
                     async with sess.get(url, params=params, headers=headers) as resp:
+                        if resp.status == 401 and can_refresh_token:
+                            logger.warning("GET %s got 401, refreshing service token", path)
+                            can_refresh_token = False
+                            headers = await self._prepare_headers(force_refresh=True)
+                            continue
                         if resp.status == 200:
                             data = await resp.json()
                             if cache:
@@ -156,11 +172,19 @@ class RequestHandler:
         )
 
         url = f"{self.url}{path}"
+        can_refresh_token = self._uses_service_token(use_token, override_token)
         last_exc: Exception | None = None
         for attempt in range(self.retries):
             try:
                 async with aiohttp.ClientSession(timeout=self.timeout) as sess:
                     async with sess.put(url, json=data, headers=headers) as resp:
+                        if resp.status == 401 and can_refresh_token:
+                            logger.warning("PUT %s got 401, refreshing service token", path)
+                            can_refresh_token = False
+                            headers = await self._prepare_headers(
+                                extra_headers=extra_headers, force_refresh=True
+                            )
+                            continue
                         if resp.status in (200, 201):
                             return await resp.json()
                         text = await resp.text()
