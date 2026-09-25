@@ -1,6 +1,11 @@
 from pathlib import Path
 
 from landuse_app.broker_handlers.base_scenario_created_handler import BaseScenarioCreatedHandler
+from landuse_app.broker_handlers.project_created_handler import ProjectCreatedHandler
+from landuse_app.broker_handlers.project_indicators import ProjectIndicatorsRecalculator
+from landuse_app.broker_handlers.scenario_zones_updated_handler import (
+    ScenarioZonesUpdatedHandler,
+)
 from landuse_app.common.consumer_wrapper import ConsumerWrapper
 from landuse_app.common.producer_wrapper import ProducerWrapper
 from loguru import logger
@@ -28,7 +33,7 @@ logger.add(
 )
 
 
-cache_enabled = bool(config.get("CACHE_ENABLED"))
+cache_enabled = str(config.get("CACHE_ENABLED")).strip().lower() in ("true", "1", "yes")
 caching_service = CachingService(Path().absolute() / "__landuse_cache__", cache_enabled)
 
 utilscofig = ConfigUtils()
@@ -53,8 +58,9 @@ producer = ProducerWrapper()
 
 otel_agent: OpenTelemetryAgent | None = None
 
-consumer.register_handler(
-    BaseScenarioCreatedHandler(
-        renovation_potential, producer.producer_service, urban_api, indicators_service
-    )
+project_indicators_recalculator = ProjectIndicatorsRecalculator(
+    renovation_potential, urban_api, indicators_service
 )
+consumer.register_handler(BaseScenarioCreatedHandler(project_indicators_recalculator))
+consumer.register_handler(ProjectCreatedHandler(project_indicators_recalculator))
+consumer.register_handler(ScenarioZonesUpdatedHandler(project_indicators_recalculator))
