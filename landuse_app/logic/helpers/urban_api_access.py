@@ -226,6 +226,23 @@ class UrbanAPIAccess:
             f"/api/v1/scenarios/{scenario_id}/geometries_with_all_objects?physical_object_type_id={object_type_id}"
         )
 
+    async def get_physical_objects_with_geometry_by_type_id(
+        self, scenario_id: int, object_type_id: int, is_context: bool = False
+    ) -> dict:
+        """Fetch only one physical-object type needed for land-use balance."""
+        context_prefix = "/context" if is_context else ""
+        response = await self.requests_handler.get(
+            f"/api/v1/scenarios/{scenario_id}{context_prefix}"
+            f"/physical_objects_with_geometry?physical_object_type_id={object_type_id}"
+        )
+        if response is None:
+            raise http_exception(
+                404,
+                "No physical objects found for the given scenario ID",
+                scenario_id,
+            )
+        return response
+
 
     async def get_functional_zones_scen_id_percentages(
         self, scenario_id: int, source: str = None

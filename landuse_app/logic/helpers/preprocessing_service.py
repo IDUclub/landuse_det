@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 import geopandas as gpd
@@ -150,6 +151,78 @@ class PreProcessingService:
             "water_objects": water,
             "green_objects": green,
             "forests": forests,
+        }
+
+    async def extract_balance_physical_objects(
+        self, scenario_id: int, is_context: bool
+    ) -> dict[str, float]:
+        """Return only areas that are used in the land-use balance.
+
+        The former implementation fetched every physical object through
+        ``geometries_with_all_objects`` and then discarded all but water, green
+        spaces, and forests. Requesting the six relevant object types directly
+        keeps the balance methodology unchanged while avoiding that full export.
+        """
+        type_groups = {
+            "water_objects": (45, 2, 44),
+            "green_objects": (47, 3),
+            "forests": (48,),
+        }
+        object_types = tuple(
+            object_type
+            for group in type_groups.values()
+            for object_type in group
+        )
+        responses = await asyncio.gather(
+            *(
+                self.urban_db_api.get_physical_objects_with_geometry_by_type_id(
+                    scenario_id, object_type, is_context
+                )
+                for object_type in object_types
+            )
+        )
+
+        rows: list[dict] = []
+        for response in responses:
+            for feature in response.get("features", []):
+                properties = feature.get("properties", {})
+                object_type = properties.get("physical_object_type", {}) or {}
+                object_type_id = object_type.get(
+                    "physical_object_type_id", object_type.get("id")
+                )
+                try:
+                    geometry = shape(feature.get("geometry"))
+                    if not geometry.is_valid:
+                        geometry = geometry.buffer(0)
+                    if geometry.is_empty or geometry.geom_type not in (
+                        "Polygon",
+                        "MultiPolygon",
+                    ):
+                        continue
+                except Exception as exc:
+                    logger.warning("Skipping invalid physical object geometry: {}", exc)
+                    continue
+                rows.append(
+                    {
+                        "physical_object_id": properties.get("physical_object_id"),
+                        "object_type_id": object_type_id,
+                        "geometry": geometry,
+                    }
+                )
+
+        if not rows:
+            return {group_name: 0.0 for group_name in type_groups}
+
+        objects_gdf = gpd.GeoDataFrame(rows, geometry="geometry", crs="EPSG:4326")
+        objects_gdf = objects_gdf.drop_duplicates("physical_object_id")
+        local_crs = objects_gdf.estimate_utm_crs()
+        objects_gdf = objects_gdf.to_crs(local_crs)
+
+        return {
+            group_name: objects_gdf[
+                objects_gdf["object_type_id"].isin(object_type_ids)
+            ].area.sum()
+            for group_name, object_type_ids in type_groups.items()
         }
 
     async def extract_landuse(
